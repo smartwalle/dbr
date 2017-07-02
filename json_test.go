@@ -10,7 +10,7 @@ type Human struct {
 	Age  int    `json:"age"`
 }
 
-func TestSession_GetStructWithJSON(t *testing.T) {
+func TestSession_GETJSON(t *testing.T) {
 	var s = getSession()
 
 	var h1 = &Human{}

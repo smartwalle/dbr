@@ -74,10 +74,10 @@ func (this *Session) RENAMENX(key, newKey string) (interface{}, error) {
 }
 
 //SORT 返回或保存给定列表、集合、有序集合 key 中经过排序的元素。
-func (this *Session) SORT(key string, params ...interface{}) (interface{}, error) {
+func (this *Session) SORT(key string, options ...interface{}) (interface{}, error) {
 	var ps []interface{}
 	ps = append(ps, key)
-	ps = append(ps, params...)
+	ps = append(ps, options...)
 	return this.Do("SORT", ps...)
 }
 
