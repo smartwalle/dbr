@@ -80,6 +80,12 @@ func (this *Session) Do(commandName string, args ...interface{}) (*Result) {
 	return result(this.c.Do(commandName, args...))
 }
 
+func (this *Session) Send(commandName string, args ...interface{}) (*Result) {
+	var err = this.c.Send(commandName, args...)
+	var r = result(nil, err)
+	return r
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 func (this *Session) Transaction(callback func(conn Conn)) (*Result) {
 	var c = this.c
