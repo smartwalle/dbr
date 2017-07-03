@@ -112,13 +112,9 @@ func (this *Result) MustFloat64() float64 {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-func (this *Result) ScanStruct(source, destination interface{}) error {
-	var err = redigo.ScanStruct(source.([]interface{}), destination)
+func (this *Result) ScanStruct(destination interface{}) error {
+	var err = redigo.ScanStruct(this.Data.([]interface{}), destination)
 	return err
-}
-
-func (this *Result) StructToArgs(key string, obj interface{}) (redigo.Args) {
-	return redigo.Args{}.Add(key).AddFlat(obj)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -194,6 +190,7 @@ func MustFloat64(reply interface{}, err error) float64 {
 	return r
 }
 
+////////////////////////////////////////////////////////////////////////////////
 func ScanStruct(source, destination interface{}) error {
 	var err = redigo.ScanStruct(source.([]interface{}), destination)
 	return err
