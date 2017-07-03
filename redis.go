@@ -76,186 +76,22 @@ func (this *Session) Close() {
 	}
 }
 
-func (this *Session) Do(commandName string, args ...interface{}) (interface{}, error) {
-	return this.c.Do(commandName, args...)
+func (this *Session) Do(commandName string, args ...interface{}) (*Result) {
+	return result(this.c.Do(commandName, args...))
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-func (this *Session) Transaction(callback func(conn Conn)) (reply interface{}, err error) {
+func (this *Session) Transaction(callback func(conn Conn)) (*Result) {
 	var c = this.c
 	c.Send("MULTI")
 	callback(c)
-	return c.Do("EXEC")
+	return result(c.Do("EXEC"))
 }
 
 func (this *Session) Pipeline(callback func(conn Conn)) (err error) {
 	var c = this.c
 	callback(c)
 	return c.Flush()
-}
-
-////////////////////////////////////////////////////////////////////////////////
-func (this *Session) Bytes(reply interface{}, err error) ([]byte, error) {
-	return Bytes(reply, err)
-}
-
-func (this *Session) Int(reply interface{}, err error) (int, error) {
-	return Int(reply, err)
-}
-
-func (this *Session) Ints(reply interface{}, err error) ([]int, error) {
-	return Ints(reply, err)
-}
-
-func (this *Session) Int64(reply interface{}, err error) (int64, error) {
-	return Int64(reply, err)
-}
-
-func (this *Session) Bool(reply interface{}, err error) (bool, error) {
-	return Bool(reply, err)
-}
-
-func (this *Session) String(reply interface{}, err error) (string, error) {
-	return String(reply, err)
-}
-
-func (this *Session) Strings(reply interface{}, err error) ([]string, error) {
-	return Strings(reply, err)
-}
-
-func (this *Session) Float64(reply interface{}, err error) (float64, error) {
-	return Float64(reply, err)
-}
-
-func (this *Session) MustBytes(reply interface{}, err error) []byte {
-	var r, _ = Bytes(reply, err)
-	return r
-}
-
-func (this *Session) MustInt(reply interface{}, err error) int {
-	var r, _ = Int(reply, err)
-	return r
-}
-
-func (this *Session) MustInts(reply interface{}, err error) []int {
-	var r, _ = Ints(reply, err)
-	return r
-}
-
-func (this *Session) MustInt64(reply interface{}, err error) int64 {
-	var r, _ = Int64(reply, err)
-	return r
-}
-
-func (this *Session) MustBool(reply interface{}, err error) bool {
-	var r, _ = Bool(reply, err)
-	return r
-}
-
-func (this *Session) MustString(reply interface{}, err error) string {
-	var r, _ = String(reply, err)
-	return r
-}
-
-func (this *Session) MustStrings(reply interface{}, err error) []string {
-	var r, _ = Strings(reply, err)
-	return r
-}
-
-func (this *Session) MustFloat64(reply interface{}, err error) float64 {
-	var r, _ = Float64(reply, err)
-	return r
-}
-
-func (this *Session) ScanStruct(source, destination interface{}) error {
-	var err = redigo.ScanStruct(source.([]interface{}), destination)
-	return err
-}
-
-func (this *Session) StructToArgs(key string, obj interface{}) (redigo.Args) {
-	return redigo.Args{}.Add(key).AddFlat(obj)
-}
-
-////////////////////////////////////////////////////////////////////////////////
-func Bytes(reply interface{}, err error) ([]byte, error) {
-	return redigo.Bytes(reply, err)
-}
-
-func Int(reply interface{}, err error) (int, error) {
-	return redigo.Int(reply, err)
-}
-
-func Ints(reply interface{}, err error) ([]int, error) {
-	return redigo.Ints(reply, err)
-}
-
-func Int64(reply interface{}, err error) (int64, error) {
-	return redigo.Int64(reply, err)
-}
-
-func Bool(reply interface{}, err error) (bool, error) {
-	return redigo.Bool(reply, err)
-}
-
-func String(reply interface{}, err error) (string, error) {
-	return redigo.String(reply, err)
-}
-
-func Strings(reply interface{}, err error) ([]string, error) {
-	return redigo.Strings(reply, err)
-}
-
-func Float64(reply interface{}, err error) (float64, error) {
-	return redigo.Float64(reply, err)
-}
-
-func MustBytes(reply interface{}, err error) []byte {
-	var r, _ = Bytes(reply, err)
-	return r
-}
-
-func MustInt(reply interface{}, err error) int {
-	var r, _ = Int(reply, err)
-	return r
-}
-
-func MustInts(reply interface{}, err error) []int {
-	var r, _ = Ints(reply, err)
-	return r
-}
-
-func MustInt64(reply interface{}, err error) int64 {
-	var r, _ = Int64(reply, err)
-	return r
-}
-
-func MustBool(reply interface{}, err error) bool {
-	var r, _ = Bool(reply, err)
-	return r
-}
-
-func MustString(reply interface{}, err error) string {
-	var r, _ = String(reply, err)
-	return r
-}
-
-func MustStrings(reply interface{}, err error) []string {
-	var r, _ = Strings(reply, err)
-	return r
-}
-
-func MustFloat64(reply interface{}, err error) float64 {
-	var r, _ = Float64(reply, err)
-	return r
-}
-
-func ScanStruct(source, destination interface{}) error {
-	var err = redigo.ScanStruct(source.([]interface{}), destination)
-	return err
-}
-
-func StructToArgs(key string, obj interface{}) (redigo.Args) {
-	return redigo.Args{}.Add(key).AddFlat(obj)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
