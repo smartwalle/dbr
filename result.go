@@ -18,63 +18,63 @@ func (this *Result) Values() ([]interface{}, error) {
 	if this.Error != nil {
 		return nil, this.Error
 	}
-	return redigo.Values(this.Data, this.Error)
+	return Values(this.Data, this.Error)
 }
 
 func (this *Result) Bytes() ([]byte, error) {
 	if this.Error != nil {
 		return nil, this.Error
 	}
-	return redigo.Bytes(this.Data, this.Error)
+	return Bytes(this.Data, this.Error)
 }
 
 func (this *Result) Int() (int, error) {
 	if this.Error != nil {
 		return 0, this.Error
 	}
-	return redigo.Int(this.Data, this.Error)
+	return Int(this.Data, this.Error)
 }
 
 func (this *Result) Ints() ([]int, error) {
 	if this.Error != nil {
 		return nil, this.Error
 	}
-	return redigo.Ints(this.Data, this.Error)
+	return Ints(this.Data, this.Error)
 }
 
 func (this *Result) Int64() (int64, error) {
 	if this.Error != nil {
 		return 0, this.Error
 	}
-	return redigo.Int64(this.Data, this.Error)
+	return Int64(this.Data, this.Error)
 }
 
 func (this *Result) Bool() (bool, error) {
 	if this.Error != nil {
 		return false, this.Error
 	}
-	return redigo.Bool(this.Data, this.Error)
+	return Bool(this.Data, this.Error)
 }
 
 func (this *Result) String() (string, error) {
 	if this.Error != nil {
 		return "", this.Error
 	}
-	return redigo.String(this.Data, this.Error)
+	return String(this.Data, this.Error)
 }
 
 func (this *Result) Strings() ([]string, error) {
 	if this.Error != nil {
 		return nil, this.Error
 	}
-	return redigo.Strings(this.Data, this.Error)
+	return Strings(this.Data, this.Error)
 }
 
 func (this *Result) Float64() (float64, error) {
 	if this.Error != nil {
 		return 0.0, this.Error
 	}
-	return redigo.Float64(this.Data, this.Error)
+	return Float64(this.Data, this.Error)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
