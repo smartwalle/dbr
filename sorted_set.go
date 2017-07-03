@@ -5,7 +5,9 @@ package dbr
 func (this *Session) ZADD(key string, params ...interface{}) (*Result) {
 	var ps []interface{}
 	ps = append(ps, key)
-	ps = append(ps, params...)
+	if len(params) > 0 {
+		ps = append(ps, params...)
+	}
 	return this.Do("ZADD", ps...)
 }
 
@@ -42,8 +44,8 @@ func (this *Session) ZRANGEBYSCORE(key string, min, max float64, options ...inte
 	ps = append(ps, key)
 	ps = append(ps, min)
 	ps = append(ps, max)
-	for _, o := range options {
-		ps = append(ps, o)
+	if len(options) > 0 {
+		ps = append(ps, options...)
 	}
 	return this.Do("ZRANGEBYSCORE", ps...)
 }
@@ -77,8 +79,8 @@ func (this *Session) ZREMRANGEBYSCORE(key string, min, max float64) (*Result) {
 func (this *Session) ZREVRANGE(key string, start, stop int, options ...interface{}) (*Result) {
 	var ps []interface{}
 	ps = append(ps, key)
-	for _, o := range options {
-		ps = append(ps, o)
+	if len(options) > 0 {
+		ps = append(ps, options...)
 	}
 	return this.Do("ZREVRANGE", ps...)
 }
@@ -89,8 +91,8 @@ func (this *Session) ZREVRANGEBYSCORE(key string, max, min float64, options ...i
 	ps = append(ps, key)
 	ps = append(ps, max)
 	ps = append(ps, min)
-	for _, o := range options {
-		ps = append(ps, o)
+	if len(options) > 0 {
+		ps = append(ps, options...)
 	}
 	return this.Do("ZREVRANGEBYSCORE", ps...)
 }
@@ -110,8 +112,8 @@ func (this *Session) ZUNIONSTORE(destination string, numKeys int, options ...int
 	var ps []interface{}
 	ps = append(ps, destination)
 	ps = append(ps, numKeys)
-	for _, o := range options {
-		ps = append(ps, o)
+	if len(options) > 0  {
+		ps = append(ps, options...)
 	}
 	return this.Do("ZUNIONSTORE", ps...)
 }
@@ -121,8 +123,8 @@ func (this *Session) ZINTERSTORE(destination string, numKeys int, options ...int
 	var ps []interface{}
 	ps = append(ps, destination)
 	ps = append(ps, numKeys)
-	for _, o := range options {
-		ps = append(ps, o)
+	if len(options) > 0 {
+		ps = append(ps, options...)
 	}
 	return this.Do("ZINTERSTORE", ps...)
 }
@@ -133,8 +135,8 @@ func (this *Session) RANGEBYLEX(key string, min, max float64, options ...interfa
 	ps = append(ps, key)
 	ps = append(ps, min)
 	ps = append(ps, max)
-	for _, o := range options {
-		ps = append(ps, o)
+	if len(options) > 0 {
+		ps = append(ps, options...)
 	}
 	return this.Do("RANGEBYLEX", ps...)
 }

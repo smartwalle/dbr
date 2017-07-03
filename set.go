@@ -4,8 +4,8 @@ package dbr
 func (this *Session) SADD(key string, members ...interface{}) (*Result) {
 	var ks []interface{}
 	ks = append(ks, key)
-	for _, m := range members {
-		ks = append(ks, m)
+	if len(members) > 0 {
+		ks = append(ks, members...)
 	}
 	return this.Do("SADD", ks...)
 }
@@ -82,8 +82,8 @@ func (this *Session) SRANDMEMBER(key string, count int) (*Result) {
 func (this *Session) SREM(key string, members ...interface{}) (*Result) {
 	var ks []interface{}
 	ks = append(ks, key)
-	for _, m := range members {
-		ks = append(ks, m)
+	if len(members) > 0 {
+		ks = append(ks, members...)
 	}
 
 	return this.Do("SREM", ks...)

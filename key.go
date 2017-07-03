@@ -9,6 +9,11 @@ func (this *Session) DEL(keys ...string) (*Result) {
 	return this.Do("DEL", ks...)
 }
 
+//DUMP 序列化给定 key ，并返回被序列化的值，使用 RESTORE 命令可以将这个值反序列化为 Redis 键。
+func (this *Session) DUMP(key string) (*Result) {
+	return this.Do("DUMP", key)
+}
+
 //EXISTS 检查给定 key 是否存在。
 func (this *Session) EXISTS(key string) (*Result) {
 	return this.Do("EXISTS", key)
@@ -58,6 +63,16 @@ func (this *Session) PEXPIRE(key string, milliseconds int) (*Result) {
 	return this.Do("PEXPIRE", key, milliseconds)
 }
 
+//PEXPIREAT 这个命令和 EXPIREAT 命令类似，但它以毫秒为单位设置 key 的过期 unix 时间戳，而不是像 EXPIREAT 那样，以秒为单位。
+func (this *Session) PEXPIREAT(key string, timestamp int64) (*Result) {
+	return this.Do("PEXPIREAT", key, timestamp)
+}
+
+//PTTL 这个命令类似于 TTL 命令，但它以毫秒为单位返回 key 的剩余生存时间，而不是像 TTL 命令那样，以秒为单位。
+func (this *Session) PTTL(key string) (*Result) {
+	return this.Do("PTTL", key)
+}
+
 //RANDOMKEY 从当前数据库中随机返回(不删除)一个 key
 func (this *Session) RANDOMKEY() (*Result) {
 	return this.Do("RANDOMKEY")
@@ -73,11 +88,25 @@ func (this *Session) RENAMENX(key, newKey string) (*Result) {
 	return this.Do("RENAMENX", key, newKey)
 }
 
+//RESTORE 反序列化给定的序列化值，并将它和给定的 key 关联。
+func (this *Session) RESTORE(key string, ttl int64, serializedValue string, options ...interface{}) (*Result) {
+	var ps []interface{}
+	ps = append(ps, key)
+	ps = append(ps, ttl)
+	ps = append(ps, serializedValue)
+	if len(options) > 0 {
+		ps = append(ps, options...)
+	}
+	return this.Do("RESTORE", ps...)
+}
+
 //SORT 返回或保存给定列表、集合、有序集合 key 中经过排序的元素。
 func (this *Session) SORT(key string, options ...interface{}) (*Result) {
 	var ps []interface{}
 	ps = append(ps, key)
-	ps = append(ps, options...)
+	if len(options)  > 0 {
+		ps = append(ps, options...)
+	}
 	return this.Do("SORT", ps...)
 }
 

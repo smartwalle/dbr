@@ -39,8 +39,8 @@ func (this *Session) LPOP(key string) (*Result) {
 func (this *Session) LPUSH(key string, values ...interface{}) (*Result) {
 	var ps []interface{}
 	ps = append(ps, key)
-	for _, v := range values {
-		ps = append(ps, v)
+	if len(values) > 0 {
+		ps = append(ps, values...)
 	}
 	return this.Do("LPUSH", ps...)
 }
@@ -84,8 +84,8 @@ func (this *Session) RPOPLPUSH(source, destination string) (*Result) {
 func (this *Session) RPUSH(key string, values ...interface{}) (*Result) {
 	var ps []interface{}
 	ps = append(ps, key)
-	for _, v := range values {
-		ps = append(ps, v)
+	if len(values) > 0 {
+		ps = append(ps, values...)
 	}
 	return this.Do("RPUSH", ps...)
 }

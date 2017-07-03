@@ -59,7 +59,9 @@ func (this *Session) HMGET(key string, fields ...string) (*Result) {
 func (this *Session) HMSET(key string, params ...interface{}) (*Result) {
 	var ps []interface{}
 	ps = append(ps, key)
-	ps = append(ps, params...)
+	if len(params) > 0 {
+		ps = append(ps, params...)
+	}
 	return this.Do("HMSET", ps...)
 }
 
