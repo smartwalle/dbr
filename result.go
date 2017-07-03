@@ -14,6 +14,13 @@ func result(data interface{}, err error) (*Result) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+func (this *Result) Values() ([]interface{}, error) {
+	if this.Error != nil {
+		return nil, this.Error
+	}
+	return redigo.Values(this.Data, this.Error)
+}
+
 func (this *Result) Bytes() ([]byte, error) {
 	if this.Error != nil {
 		return nil, this.Error
@@ -71,6 +78,11 @@ func (this *Result) Float64() (float64, error) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+func (this *Result) MustValues() ([]interface{}) {
+	var r, _ = this.Values()
+	return r
+}
+
 func (this *Result) MustBytes() []byte {
 	var r, _ = this.Bytes()
 	return r
@@ -118,6 +130,10 @@ func (this *Result) ScanStruct(destination interface{}) error {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+func Values(reply interface{}, err error) ([]interface{}, error) {
+	return redigo.Values(reply, err)
+}
+
 func Bytes(reply interface{}, err error) ([]byte, error) {
 	return redigo.Bytes(reply, err)
 }
@@ -148,6 +164,11 @@ func Strings(reply interface{}, err error) ([]string, error) {
 
 func Float64(reply interface{}, err error) (float64, error) {
 	return redigo.Float64(reply, err)
+}
+
+func MustValues(reply interface{}, err error) ([]interface{}) {
+	var r, _ = Values(reply, err)
+	return r
 }
 
 func MustBytes(reply interface{}, err error) []byte {
