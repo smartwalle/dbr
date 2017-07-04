@@ -2,6 +2,7 @@ package dbr
 
 import (
 	redigo "github.com/garyburd/redigo/redis"
+	"errors"
 )
 
 type Result struct {
@@ -125,7 +126,7 @@ func (this *Result) MustFloat64() float64 {
 
 ////////////////////////////////////////////////////////////////////////////////
 func (this *Result) ScanStruct(destination interface{}) error {
-	var err = redigo.ScanStruct(this.Data.([]interface{}), destination)
+	var err = ScanStruct(this.Data, destination)
 	return err
 }
 
@@ -213,6 +214,10 @@ func MustFloat64(reply interface{}, err error) float64 {
 
 ////////////////////////////////////////////////////////////////////////////////
 func ScanStruct(source, destination interface{}) error {
+	if len(MustValues(source, nil)) == 0 {
+		return errors.New("source argument is nil")
+	}
+
 	var err = redigo.ScanStruct(source.([]interface{}), destination)
 	return err
 }
