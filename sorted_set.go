@@ -79,6 +79,8 @@ func (this *Session) ZREMRANGEBYSCORE(key string, min, max float64) (*Result) {
 func (this *Session) ZREVRANGE(key string, start, stop int, options ...interface{}) (*Result) {
 	var ps []interface{}
 	ps = append(ps, key)
+	ps = append(ps, start)
+	ps = append(ps, stop)
 	if len(options) > 0 {
 		ps = append(ps, options...)
 	}
