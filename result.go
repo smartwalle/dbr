@@ -78,6 +78,13 @@ func (this *Result) Float64() (float64, error) {
 	return Float64(this.Data, this.Error)
 }
 
+func (this *Result) Map() (map[string]string, error) {
+	if this.Error != nil {
+		return nil, this.Error
+	}
+	return Map(this.Data, this.Error)
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 func (this *Result) MustValues() ([]interface{}) {
 	var r, _ = this.Values()
@@ -124,6 +131,14 @@ func (this *Result) MustFloat64() float64 {
 	return r
 }
 
+func (this *Result) MustMap() (map[string]string) {
+	var r, _ = this.Map()
+	if r == nil {
+		r = make(map[string]string)
+	}
+	return r
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 func (this *Result) ScanStruct(destination interface{}) error {
 	var err = ScanStruct(this.Data, destination)
@@ -165,6 +180,10 @@ func Strings(reply interface{}, err error) ([]string, error) {
 
 func Float64(reply interface{}, err error) (float64, error) {
 	return redigo.Float64(reply, err)
+}
+
+func Map(reply interface{}, err error) (map[string]string, error) {
+	return redigo.StringMap(reply, err)
 }
 
 func MustValues(reply interface{}, err error) ([]interface{}) {
@@ -209,6 +228,14 @@ func MustStrings(reply interface{}, err error) []string {
 
 func MustFloat64(reply interface{}, err error) float64 {
 	var r, _ = Float64(reply, err)
+	return r
+}
+
+func MustMap(reply interface{}, err error) map[string]string {
+	var r, _ = Map(reply, err)
+	if r == nil {
+		r = make(map[string]string)
+	}
 	return r
 }
 
