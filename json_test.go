@@ -16,10 +16,10 @@ func TestSession_GETJSON(t *testing.T) {
 	var h1 = &Human{}
 	h1.Name = "human"
 	h1.Age = 20
-	s.SETJSON("h", h1)
+	s.MarshalJSON("h", h1)
 
 	var h2 *Human
-	s.GETJSON("h", &h2)
+	s.UnmarshalJSON("h", &h2)
 	if h2 != nil {
 		fmt.Println(h2.Name, h2.Age)
 	}
