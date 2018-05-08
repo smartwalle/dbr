@@ -1,10 +1,13 @@
 package dbr
 
 import (
-	"fmt"
+	"errors"
 	redigo "github.com/garyburd/redigo/redis"
-	"os"
 	"time"
+)
+
+var (
+	InvalidConnErr = errors.New("invalid connection")
 )
 
 func NewRedis(url, password string, dbIndex, maxActive, maxIdle int) (p *Pool) {
@@ -16,15 +19,13 @@ func NewRedis(url, password string, dbIndex, maxActive, maxIdle int) (p *Pool) {
 		}
 
 		if err != nil {
-			fmt.Println("连接 Redis 服务器失败:", url, err)
-			os.Exit(-1)
+			return nil, err
 		}
 
 		_, err = c.Do("SELECT", dbIndex)
 		if err != nil {
-			fmt.Println("Redis 执行 SELECT 指令失败:", dbIndex, err)
 			c.Close()
-			os.Exit(-1)
+			return nil, err
 		}
 
 		return c, err
@@ -76,28 +77,39 @@ func (this *Session) Close() {
 	}
 }
 
-func (this *Session) Do(commandName string, args ...interface{}) (*Result) {
-	return result(this.c.Do(commandName, args...))
+func (this *Session) Do(commandName string, args ...interface{}) *Result {
+	if this.c != nil {
+		return result(this.c.Do(commandName, args...))
+	}
+	return result(nil, InvalidConnErr)
 }
 
-func (this *Session) Send(commandName string, args ...interface{}) (*Result) {
-	var err = this.c.Send(commandName, args...)
-	var r = result(nil, err)
-	return r
+func (this *Session) Send(commandName string, args ...interface{}) *Result {
+	var err = InvalidConnErr
+	if this.c != nil {
+		err = this.c.Send(commandName, args...)
+	}
+	return result(nil, err)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-func (this *Session) Transaction(callback func(conn Conn)) (*Result) {
-	var c = this.c
-	c.Send("MULTI")
-	callback(c)
-	return result(c.Do("EXEC"))
+func (this *Session) Transaction(callback func(conn Conn)) *Result {
+	if this.c != nil {
+		var c = this.c
+		c.Send("MULTI")
+		callback(c)
+		return result(c.Do("EXEC"))
+	}
+	return result(nil, InvalidConnErr)
 }
 
 func (this *Session) Pipeline(callback func(conn Conn)) (err error) {
-	var c = this.c
-	callback(c)
-	return c.Flush()
+	if this.c != nil {
+		var c = this.c
+		callback(c)
+		return c.Flush()
+	}
+	return InvalidConnErr
 }
 
 ////////////////////////////////////////////////////////////////////////////////
