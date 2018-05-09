@@ -33,3 +33,14 @@ func (this *Session) UnmarshalJSON(key string, des interface{}) (error) {
 
 	return nil
 }
+
+func (this *Result) UnmarshalJSON(des interface{}) (err error) {
+	bs, err := this.Bytes()
+	if err != nil {
+		return err
+	}
+	if err = json.Unmarshal(bs, des); err != nil {
+		return err
+	}
+	return err
+}
