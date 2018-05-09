@@ -1,8 +1,8 @@
 package dbr
 
 import (
-	redigo "github.com/garyburd/redigo/redis"
 	"errors"
+	redigo "github.com/garyburd/redigo/redis"
 )
 
 type Result struct {
@@ -10,7 +10,7 @@ type Result struct {
 	Error error
 }
 
-func result(data interface{}, err error) (*Result) {
+func result(data interface{}, err error) *Result {
 	return &Result{data, err}
 }
 
@@ -86,7 +86,7 @@ func (this *Result) Map() (map[string]string, error) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-func (this *Result) MustValues() ([]interface{}) {
+func (this *Result) MustValues() []interface{} {
 	var r, _ = this.Values()
 	return r
 }
@@ -131,7 +131,7 @@ func (this *Result) MustFloat64() float64 {
 	return r
 }
 
-func (this *Result) MustMap() (map[string]string) {
+func (this *Result) MustMap() map[string]string {
 	var r, _ = this.Map()
 	if r == nil {
 		r = make(map[string]string)
@@ -186,7 +186,7 @@ func Map(reply interface{}, err error) (map[string]string, error) {
 	return redigo.StringMap(reply, err)
 }
 
-func MustValues(reply interface{}, err error) ([]interface{}) {
+func MustValues(reply interface{}, err error) []interface{} {
 	var r, _ = Values(reply, err)
 	return r
 }
@@ -249,6 +249,6 @@ func ScanStruct(source, destination interface{}) error {
 	return err
 }
 
-func StructToArgs(key string, obj interface{}) (redigo.Args) {
+func StructToArgs(key string, obj interface{}) redigo.Args {
 	return redigo.Args{}.Add(key).AddFlat(obj)
 }

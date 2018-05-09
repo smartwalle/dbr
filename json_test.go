@@ -1,8 +1,8 @@
 package dbr
 
 import (
-	"testing"
 	"fmt"
+	"testing"
 )
 
 type Human struct {

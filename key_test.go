@@ -47,7 +47,7 @@ func TestSession_EXPIREAT(t *testing.T) {
 	var s = getSession()
 	s.SET("2s", "2 秒后过期")
 
-	if r := s.EXPIREAT("2s", time.Now().Unix() + 2); r.Error != nil {
+	if r := s.EXPIREAT("2s", time.Now().Unix()+2); r.Error != nil {
 		t.Fatal("EXPIREAT 指令错误", r.Error)
 	}
 
