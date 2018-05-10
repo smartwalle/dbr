@@ -20,7 +20,7 @@ func (this *Session) EXISTS(key string) *Result {
 }
 
 //EXPIRE 为给定 key 设置生存时间，当 key 过期时(生存时间为 0 )，它会被自动删除。
-func (this *Session) EXPIRE(key string, seconds int) *Result {
+func (this *Session) EXPIRE(key string, seconds int64) *Result {
 	return this.Do("EXPIRE", key, seconds)
 }
 
@@ -59,7 +59,7 @@ func (this *Session) PERSIST(key string) *Result {
 }
 
 //PEXPIRE 这个命令和 EXPIRE 命令的作用类似，但是它以毫秒为单位设置 key 的生存时间，而不像 EXPIRE 命令那样，以秒为单位。
-func (this *Session) PEXPIRE(key string, milliseconds int) *Result {
+func (this *Session) PEXPIRE(key string, milliseconds int64) *Result {
 	return this.Do("PEXPIRE", key, milliseconds)
 }
 

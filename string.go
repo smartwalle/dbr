@@ -85,7 +85,7 @@ func (this *Session) SETBIT(key string, offset int, value string) *Result {
 }
 
 //SETEX 将值 value 关联到 key ，并将 key 的生存时间设为 seconds (以秒为单位)。
-func (this *Session) SETEX(key string, seconds int, value interface{}) *Result {
+func (this *Session) SETEX(key string, seconds int64, value interface{}) *Result {
 	return this.Do("SETEX", key, seconds, value)
 }
 
