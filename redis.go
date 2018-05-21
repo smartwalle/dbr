@@ -103,15 +103,6 @@ func (this *Session) Transaction(callback func(conn Conn)) *Result {
 	return result(nil, InvalidConnErr)
 }
 
-func (this *Session) Pipeline(callback func(conn Conn)) (err error) {
-	if this.c != nil {
-		var c = this.c
-		callback(c)
-		return c.Flush()
-	}
-	return InvalidConnErr
-}
-
 ////////////////////////////////////////////////////////////////////////////////
 type Conn interface {
 	redigo.Conn
