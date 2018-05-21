@@ -2,7 +2,7 @@ package dbr
 
 import (
 	"errors"
-	redigo "github.com/garyburd/redigo/redis"
+	redigo "github.com/gomodule/redigo/redis"
 	"time"
 )
 
