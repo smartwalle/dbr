@@ -1,19 +1,11 @@
 package dbr
 
-func (this *Session) BLPOP(keys ...string) *Result {
-	var ps []interface{}
-	for _, k := range keys {
-		ps = append(ps, k)
-	}
-	return this.Do("BLPOP", ps...)
+func (this *Session) BLPOP(params ...interface{}) *Result {
+	return this.Do("BLPOP", params...)
 }
 
-func (this *Session) BRPOP(keys ...string) *Result {
-	var ps []interface{}
-	for _, k := range keys {
-		ps = append(ps, k)
-	}
-	return this.Do("BRPOP", ps...)
+func (this *Session) BRPOP(params ...interface{}) *Result {
+	return this.Do("BRPOP", params...)
 }
 
 func (this *Session) BRPOPLPUSH(source, destination string, timeout int) *Result {
