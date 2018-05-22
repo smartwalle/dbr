@@ -38,18 +38,18 @@ func NewRedis(url, password string, dbIndex, maxActive, maxIdle int) (p *Pool) {
 	pool.Wait = true
 	pool.IdleTimeout = 180 * time.Second
 	pool.Dial= dialFunc
-	p.p = pool
+	p.Pool = pool
 
 	return p
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 type Pool struct {
-	p *redis.Pool
+	*redis.Pool
 }
 
 func (this *Pool) GetSession() *Session {
-	var c = this.p.Get()
+	var c = this.Pool.Get()
 	return NewSession(c)
 }
 
