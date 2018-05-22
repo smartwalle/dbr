@@ -32,10 +32,12 @@ func NewRedis(url, password string, dbIndex, maxActive, maxIdle int) (p *Pool) {
 	}
 
 	p = &Pool{}
-	var pool = redigo.NewPool(dialFunc, maxIdle)
+	var pool = &redigo.Pool{}
+	pool.MaxIdle = maxIdle
 	pool.MaxActive = maxActive
-	pool.IdleTimeout = 180 * time.Second
 	pool.Wait = true
+	pool.IdleTimeout = 180 * time.Second
+	pool.Dial= dialFunc
 	p.p = pool
 
 	return p
