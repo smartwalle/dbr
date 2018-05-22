@@ -2,6 +2,7 @@ package dbr
 
 import (
 	"errors"
+	"github.com/FZambia/sentinel"
 	"github.com/gomodule/redigo/redis"
 	"time"
 )
@@ -10,12 +11,12 @@ var (
 	InvalidConnErr = errors.New("invalid connection")
 )
 
-func NewRedis(url, password string, dbIndex, maxActive, maxIdle int) (p *Pool) {
+func NewRedis(addr, password string, dbIndex, maxActive, maxIdle int) (p *Pool) {
 	var dialFunc = func() (c redis.Conn, err error) {
 		if len(password) > 0 {
-			c, err = redis.Dial("tcp", url, redis.DialPassword(password))
+			c, err = redis.Dial("tcp", addr, redis.DialPassword(password))
 		} else {
-			c, err = redis.Dial("tcp", url)
+			c, err = redis.Dial("tcp", addr)
 		}
 
 		if err != nil {
@@ -37,7 +38,63 @@ func NewRedis(url, password string, dbIndex, maxActive, maxIdle int) (p *Pool) {
 	pool.MaxActive = maxActive
 	pool.Wait = true
 	pool.IdleTimeout = 180 * time.Second
-	pool.Dial= dialFunc
+	pool.Dial = dialFunc
+	p.Pool = pool
+
+	return p
+}
+
+func NewRedisWithSentinel(addrs []string, masterName, password string, dbIndex, maxActive, maxIdle int) (p *Pool) {
+	var s = &sentinel.Sentinel{
+		Addrs:      addrs,
+		MasterName: masterName,
+		Dial: func(addr string) (redis.Conn, error) {
+			timeout := 500 * time.Millisecond
+			c, err := redis.Dial("tcp", addr, redis.DialReadTimeout(timeout), redis.DialWriteTimeout(timeout), redis.DialConnectTimeout(timeout))
+			if err != nil {
+				return nil, err
+			}
+			return c, nil
+		},
+	}
+
+	var dialFunc = func() (c redis.Conn, err error) {
+		addr, err := s.MasterAddr()
+
+		if len(password) > 0 {
+			c, err = redis.Dial("tcp", addr, redis.DialPassword(password))
+		} else {
+			c, err = redis.Dial("tcp", addr)
+		}
+
+		if err != nil {
+			return nil, err
+		}
+
+		_, err = c.Do("SELECT", dbIndex)
+		if err != nil {
+			c.Close()
+			return nil, err
+		}
+		return c, err
+	}
+
+	var testOnBorrow = func(c redis.Conn, t time.Time) error {
+		if !sentinel.TestRole(c, "master") {
+			return errors.New("role check failed")
+		} else {
+			return nil
+		}
+	}
+
+	p = &Pool{}
+	var pool = &redis.Pool{}
+	pool.MaxIdle = maxIdle
+	pool.MaxActive = maxActive
+	pool.Wait = true
+	pool.IdleTimeout = 180 * time.Second
+	pool.Dial = dialFunc
+	pool.TestOnBorrow = testOnBorrow
 	p.Pool = pool
 
 	return p
