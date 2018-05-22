@@ -2,7 +2,7 @@ package dbr
 
 import (
 	"errors"
-	redigo "github.com/gomodule/redigo/redis"
+	"github.com/gomodule/redigo/redis"
 )
 
 type Result struct {
@@ -147,43 +147,43 @@ func (this *Result) ScanStruct(destination interface{}) error {
 
 ////////////////////////////////////////////////////////////////////////////////
 func Values(reply interface{}, err error) ([]interface{}, error) {
-	return redigo.Values(reply, err)
+	return redis.Values(reply, err)
 }
 
 func Bytes(reply interface{}, err error) ([]byte, error) {
-	return redigo.Bytes(reply, err)
+	return redis.Bytes(reply, err)
 }
 
 func Int(reply interface{}, err error) (int, error) {
-	return redigo.Int(reply, err)
+	return redis.Int(reply, err)
 }
 
 func Ints(reply interface{}, err error) ([]int, error) {
-	return redigo.Ints(reply, err)
+	return redis.Ints(reply, err)
 }
 
 func Int64(reply interface{}, err error) (int64, error) {
-	return redigo.Int64(reply, err)
+	return redis.Int64(reply, err)
 }
 
 func Bool(reply interface{}, err error) (bool, error) {
-	return redigo.Bool(reply, err)
+	return redis.Bool(reply, err)
 }
 
 func String(reply interface{}, err error) (string, error) {
-	return redigo.String(reply, err)
+	return redis.String(reply, err)
 }
 
 func Strings(reply interface{}, err error) ([]string, error) {
-	return redigo.Strings(reply, err)
+	return redis.Strings(reply, err)
 }
 
 func Float64(reply interface{}, err error) (float64, error) {
-	return redigo.Float64(reply, err)
+	return redis.Float64(reply, err)
 }
 
 func Map(reply interface{}, err error) (map[string]string, error) {
-	return redigo.StringMap(reply, err)
+	return redis.StringMap(reply, err)
 }
 
 func MustValues(reply interface{}, err error) []interface{} {
@@ -245,10 +245,10 @@ func ScanStruct(source, destination interface{}) error {
 		return errors.New("source argument is nil")
 	}
 
-	var err = redigo.ScanStruct(source.([]interface{}), destination)
+	var err = redis.ScanStruct(source.([]interface{}), destination)
 	return err
 }
 
-func StructToArgs(key string, obj interface{}) redigo.Args {
-	return redigo.Args{}.Add(key).AddFlat(obj)
+func StructToArgs(key string, obj interface{}) redis.Args {
+	return redis.Args{}.Add(key).AddFlat(obj)
 }

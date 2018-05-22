@@ -2,7 +2,7 @@ package dbr
 
 import (
 	"errors"
-	redigo "github.com/gomodule/redigo/redis"
+	"github.com/gomodule/redigo/redis"
 	"time"
 )
 
@@ -11,11 +11,11 @@ var (
 )
 
 func NewRedis(url, password string, dbIndex, maxActive, maxIdle int) (p *Pool) {
-	var dialFunc = func() (c redigo.Conn, err error) {
+	var dialFunc = func() (c redis.Conn, err error) {
 		if len(password) > 0 {
-			c, err = redigo.Dial("tcp", url, redigo.DialPassword(password))
+			c, err = redis.Dial("tcp", url, redis.DialPassword(password))
 		} else {
-			c, err = redigo.Dial("tcp", url)
+			c, err = redis.Dial("tcp", url)
 		}
 
 		if err != nil {
@@ -32,7 +32,7 @@ func NewRedis(url, password string, dbIndex, maxActive, maxIdle int) (p *Pool) {
 	}
 
 	p = &Pool{}
-	var pool = &redigo.Pool{}
+	var pool = &redis.Pool{}
 	pool.MaxIdle = maxIdle
 	pool.MaxActive = maxActive
 	pool.Wait = true
@@ -45,7 +45,7 @@ func NewRedis(url, password string, dbIndex, maxActive, maxIdle int) (p *Pool) {
 
 ////////////////////////////////////////////////////////////////////////////////
 type Pool struct {
-	p *redigo.Pool
+	p *redis.Pool
 }
 
 func (this *Pool) GetSession() *Session {
@@ -69,7 +69,7 @@ type Session struct {
 	c Conn
 }
 
-func (this *Session) Conn() redigo.Conn {
+func (this *Session) Conn() redis.Conn {
 	return this.c
 }
 
@@ -107,7 +107,7 @@ func (this *Session) Transaction(callback func(conn Conn)) *Result {
 
 ////////////////////////////////////////////////////////////////////////////////
 type Conn interface {
-	redigo.Conn
+	redis.Conn
 }
 
 ////////////////////////////////////////////////////////////////////////////////
