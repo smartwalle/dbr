@@ -130,10 +130,11 @@ func (this *Session) Conn() redis.Conn {
 	return this.c
 }
 
-func (this *Session) Close() {
+func (this *Session) Close() error {
 	if this.c != nil {
-		this.c.Close()
+		return this.c.Close()
 	}
+	return nil
 }
 
 func (this *Session) Do(commandName string, args ...interface{}) *Result {
