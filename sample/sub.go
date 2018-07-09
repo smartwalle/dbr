@@ -1,9 +1,9 @@
 package main
 
 import (
-	"github.com/smartwalle/dbr"
-	"github.com/gomodule/redigo/redis"
 	"fmt"
+	"github.com/gomodule/redigo/redis"
+	"github.com/smartwalle/dbr"
 )
 
 func main() {
