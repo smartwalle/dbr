@@ -57,7 +57,7 @@ import (
 //  	}
 //  }
 
-// copy from github.com/gomodule/redigo
+// copy from https://github.com/FZambia/go-sentinel
 type Sentinel struct {
 	// Addrs is a slice with known Sentinel addresses.
 	Addrs []string
