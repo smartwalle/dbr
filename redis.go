@@ -2,6 +2,7 @@ package dbr
 
 import (
 	"errors"
+	"github.com/FZambia/sentinel"
 	"github.com/gomodule/redigo/redis"
 	"time"
 )
@@ -44,7 +45,7 @@ func NewRedis(addr, password string, dbIndex, maxActive, maxIdle int) (p *Pool) 
 }
 
 func NewRedisWithSentinel(addrs []string, masterName, password string, dbIndex, maxActive, maxIdle int) (p *Pool) {
-	var s = &Sentinel{
+	var s = &sentinel.Sentinel{
 		Addrs:      addrs,
 		MasterName: masterName,
 		Dial: func(addr string) (redis.Conn, error) {
@@ -79,7 +80,7 @@ func NewRedisWithSentinel(addrs []string, masterName, password string, dbIndex, 
 	}
 
 	var testOnBorrow = func(c redis.Conn, t time.Time) error {
-		if !TestRole(c, "master") {
+		if !sentinel.TestRole(c, "master") {
 			return errors.New("role check failed")
 		} else {
 			return nil
