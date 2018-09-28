@@ -11,6 +11,18 @@ package dbr
 // rSess.GET("k1")
 // rSess.Commit()
 
+func (this *Session) Watch(keys ...string) *Result {
+	var ks []interface{}
+	for _, k := range keys {
+		ks = append(ks, k)
+	}
+	return this.Do("WATCH", ks...)
+}
+
+func (this *Session) UnWatch() *Result {
+	return this.Do("UNWATCH")
+}
+
 func (this *Session) BeginTx() *Result {
 	return this.Send("MULTI")
 }
