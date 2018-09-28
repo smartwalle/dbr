@@ -153,17 +153,6 @@ func (this *Session) Send(commandName string, args ...interface{}) *Result {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-func (this *Session) Transaction(callback func(conn Conn)) *Result {
-	if this.c != nil {
-		var c = this.c
-		c.Send("MULTI")
-		callback(c)
-		return result(c.Do("EXEC"))
-	}
-	return result(nil, InvalidConnErr)
-}
-
-////////////////////////////////////////////////////////////////////////////////
 type Conn interface {
 	redis.Conn
 }
