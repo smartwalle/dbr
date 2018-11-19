@@ -10,6 +10,6 @@ func TestSession_Receive(t *testing.T) {
 	rSess.Send("SET", "test_key", 10)
 	rSess.Send("GET", "test_key")
 	rSess.Flush()
-	fmt.Println(rSess.Receive())
-	fmt.Println(rSess.Receive().Int())
+	fmt.Println("Pipe SET", rSess.Receive().MustString())
+	fmt.Println("Pipe GET", rSess.Receive().MustInt())
 }
