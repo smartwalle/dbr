@@ -6,9 +6,9 @@ package dbr
 // defer rSess.Close()
 //
 // rSess.BeginTx()
-// rSess.SET("k1", "v1")
-// rSess.SET("k2", "v2")
-// rSess.GET("k1")
+// rSess.Send(...)
+// rSess.Send(...)
+// rSess.Send(...)
 // rSess.Commit()
 
 func (this *Session) Watch(keys ...string) *Result {
