@@ -1,6 +1,9 @@
 package dbr
 
-import "time"
+import (
+	"fmt"
+	"time"
+)
 
 func (this *Session) WithBlock(key string, blockValue string, blockSeconds int64) (bool, *Result) {
 	var rResult = this.GET(key)
@@ -10,8 +13,7 @@ func (this *Session) WithBlock(key string, blockValue string, blockSeconds int64
 
 	if rResult.Data == nil {
 		// 当从 redis 没有获取到数据的时候，写入 阻塞 数据
-		if this.SETNX(key, blockValue).MustInt() == 1 {
-			this.EXPIRE(key, blockSeconds)
+		if this.SET(key, blockValue, "EX", blockSeconds, "NX").MustString() == "OK" {
 			return false, nil
 		}
 		time.Sleep(time.Millisecond * 500)

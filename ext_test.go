@@ -6,6 +6,10 @@ import (
 )
 
 func TestSession_WithBlock(t *testing.T) {
+	withBlock()
+}
+
+func withBlock() {
 	var rSess = getSession()
 	defer rSess.Close()
 
