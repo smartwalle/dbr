@@ -1,7 +1,6 @@
 package dbr
 
 import (
-	"fmt"
 	"time"
 )
 
