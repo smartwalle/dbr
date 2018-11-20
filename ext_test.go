@@ -26,7 +26,7 @@ func TestSession_WithBlock(t *testing.T) {
 		}
 	}
 
-	//p = &People{"people_1", 100}
-	//rSess.MarshalJSONEx(pKey, 30, p)
-	//fmt.Println("新建数据", p.Name, p.Age)
+	p = &People{"people_1", 100}
+	rSess.MarshalJSONEx(pKey, 30, p)
+	fmt.Println("新建数据", p.Name, p.Age)
 }
