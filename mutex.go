@@ -189,8 +189,7 @@ func (this *Mutex) Extend() bool {
 
 	n := 0
 	for _, pool := range this.pools {
-		ok := this.touch(pool, this.value, int(this.expire/time.Millisecond))
-		if ok {
+		if this.touch(pool, this.value, int(this.expire/time.Millisecond)) {
 			n++
 		}
 	}
