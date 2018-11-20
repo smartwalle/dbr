@@ -1,7 +1,6 @@
 package dbr
 
 import (
-	"fmt"
 	"testing"
 )
 
@@ -12,6 +11,11 @@ func TestSession_Receive(t *testing.T) {
 	rSess.Send("SET", "test_key", 10)
 	rSess.Send("GET", "test_key")
 	rSess.Flush()
-	fmt.Println("Pipe SET", rSess.Receive().MustString())
-	fmt.Println("Pipe GET", rSess.Receive().MustInt())
+
+	if r := rSess.Receive(); r.Error != nil {
+		t.Fatal("Pipe SET 指令错误", r.Error)
+	}
+	if r := rSess.Receive(); r.Error != nil {
+		t.Fatal("Pipe GET 指令错误", r.Error)
+	}
 }

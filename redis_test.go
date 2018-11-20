@@ -1,10 +1,5 @@
 package dbr
 
-import (
-//"testing"
-//"fmt"
-)
-
 type People struct {
 	Name string `json:"name"`
 	Age  int    `json:"age"`
@@ -23,21 +18,3 @@ func getSession() *Session {
 	var s = getPool().GetSession()
 	return s
 }
-
-//func TestRedis(t *testing.T) {
-//
-//	var c = s.GetSession()
-//
-//	var p1 = Plan{Title:"pt1", Text:"t1"}
-//	c.HMSET("p1", &p1)
-//
-//	var p2 Plan
-//
-//	fmt.Println(c.HGETALL("p1", &p2))
-//	fmt.Println(p2)
-//}
-//
-//type Plan struct {
-//	Title string `redis:"title"`
-//	Text  string `redis:"text"`
-//}
