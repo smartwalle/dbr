@@ -1,5 +1,7 @@
 package dbr
 
+import "time"
+
 func (this *Session) WithBlock(key string, blockValue string, blockSeconds int64) (bool, *Result) {
 	var rResult = this.GET(key)
 	if rResult.Error != nil {
@@ -8,8 +10,12 @@ func (this *Session) WithBlock(key string, blockValue string, blockSeconds int64
 
 	if rResult.Data == nil {
 		// 当从 redis 没有获取到数据的时候，写入 阻塞 数据
-		this.SETEX(key, blockSeconds, blockValue)
-		return false, nil
+		if this.SETNX(key, blockValue).MustInt() == 1 {
+			this.EXPIRE(key, blockSeconds)
+			return false, nil
+		}
+		time.Sleep(time.Millisecond * 500)
+		return this.WithBlock(key, blockValue, blockSeconds)
 	}
 
 	if rResult.MustString() == blockValue {

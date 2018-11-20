@@ -9,7 +9,7 @@ func TestSession_WithBlock(t *testing.T) {
 	var rSess = getSession()
 	defer rSess.Close()
 
-	var pKey = "p1"
+	var pKey = "p2"
 
 	var block, rResult = rSess.WithBlock(pKey, "null", 30)
 	if block {
@@ -26,7 +26,7 @@ func TestSession_WithBlock(t *testing.T) {
 		}
 	}
 
-	p = &People{"people_1", 100}
-	rSess.MarshalJSONEx(pKey, 30, p)
-	fmt.Println("新建数据", p.Name, p.Age)
+	//p = &People{"people_1", 100}
+	//rSess.MarshalJSONEx(pKey, 30, p)
+	//fmt.Println("新建数据", p.Name, p.Age)
 }
