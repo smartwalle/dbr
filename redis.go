@@ -1,9 +1,11 @@
 package dbr
 
 import (
+	"crypto/tls"
 	"errors"
 	"github.com/FZambia/sentinel"
 	"github.com/gomodule/redigo/redis"
+	"net"
 	"time"
 )
 
@@ -11,24 +13,55 @@ var (
 	ErrInvalidConn = errors.New("dbr: invalid connection")
 )
 
-func NewRedis(addr, password string, dbIndex, maxActive, maxIdle int) (p *Pool) {
+// --------------------------------------------------------------------------------
+
+func DialReadTimeout(d time.Duration) redis.DialOption {
+	return redis.DialReadTimeout(d)
+}
+
+func DialWriteTimeout(d time.Duration) redis.DialOption {
+	return redis.DialWriteTimeout(d)
+}
+
+func DialConnectTimeout(d time.Duration) redis.DialOption {
+	return redis.DialConnectTimeout(d)
+}
+
+func DialKeepAlive(d time.Duration) redis.DialOption {
+	return redis.DialKeepAlive(d)
+}
+
+func DialNetDial(dial func(network, addr string) (net.Conn, error)) redis.DialOption {
+	return redis.DialNetDial(dial)
+}
+
+func DialDatabase(db int) redis.DialOption {
+	return redis.DialDatabase(db)
+}
+
+func DialPassword(password string) redis.DialOption {
+	return redis.DialPassword(password)
+}
+
+func DialTLSConfig(c *tls.Config) redis.DialOption {
+	return redis.DialTLSConfig(c)
+}
+
+func DialTLSSkipVerify(skip bool) redis.DialOption {
+	return redis.DialTLSSkipVerify(skip)
+}
+
+func DialUseTLS(useTLS bool) redis.DialOption {
+	return redis.DialUseTLS(useTLS)
+}
+
+// --------------------------------------------------------------------------------
+func NewRedis(addr string, maxActive, maxIdle int, opts ...redis.DialOption) (p *Pool) {
 	var dialFunc = func() (c redis.Conn, err error) {
-		if len(password) > 0 {
-			c, err = redis.Dial("tcp", addr, redis.DialPassword(password))
-		} else {
-			c, err = redis.Dial("tcp", addr)
-		}
-
+		c, err = redis.Dial("tcp", addr, opts...)
 		if err != nil {
 			return nil, err
 		}
-
-		_, err = c.Do("SELECT", dbIndex)
-		if err != nil {
-			c.Close()
-			return nil, err
-		}
-
 		return c, err
 	}
 
@@ -42,7 +75,7 @@ func NewRedis(addr, password string, dbIndex, maxActive, maxIdle int) (p *Pool) 
 	return &Pool{pool}
 }
 
-func NewRedisWithSentinel(addrs []string, masterName, password string, dbIndex, maxActive, maxIdle int) (p *Pool) {
+func NewRedisWithSentinel(addrs []string, masterName string, maxActive, maxIdle int, opts ...redis.DialOption) (p *Pool) {
 	var s = &sentinel.Sentinel{
 		Addrs:      addrs,
 		MasterName: masterName,
@@ -58,20 +91,9 @@ func NewRedisWithSentinel(addrs []string, masterName, password string, dbIndex, 
 
 	var dialFunc = func() (c redis.Conn, err error) {
 		addr, err := s.MasterAddr()
-
-		if len(password) > 0 {
-			c, err = redis.Dial("tcp", addr, redis.DialPassword(password))
-		} else {
-			c, err = redis.Dial("tcp", addr)
-		}
+		c, err = redis.Dial("tcp", addr, opts...)
 
 		if err != nil {
-			return nil, err
-		}
-
-		_, err = c.Do("SELECT", dbIndex)
-		if err != nil {
-			c.Close()
 			return nil, err
 		}
 		return c, err
