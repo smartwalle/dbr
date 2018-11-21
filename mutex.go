@@ -61,6 +61,9 @@ func WithRetryCount(count int) Option {
 
 func WithQuorum(quorum int) Option {
 	return optionFunc(func(m *Mutex) {
+		if quorum <= 0 {
+			quorum = len(m.pools)/2 + 1
+		}
 		m.quorum = int(math.Min(float64(quorum), float64(len(m.pools))))
 	})
 }

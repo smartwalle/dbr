@@ -5,7 +5,7 @@ import (
 )
 
 func main() {
-	var p = dbr.NewRedis("127.0.0.1:6379", "", 15, 30, 1)
+	var p = dbr.NewRedis("127.0.0.1:6379", 15, 30)
 
 	var rSess = p.GetSession()
 
