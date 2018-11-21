@@ -8,7 +8,7 @@ import (
 )
 
 var (
-	InvalidConnErr = errors.New("invalid connection")
+	ErrInvalidConn = errors.New("dbr: invalid connection")
 )
 
 func NewRedis(addr, password string, dbIndex, maxActive, maxIdle int) (p *Pool) {
@@ -32,16 +32,14 @@ func NewRedis(addr, password string, dbIndex, maxActive, maxIdle int) (p *Pool) 
 		return c, err
 	}
 
-	p = &Pool{}
 	var pool = &redis.Pool{}
 	pool.MaxIdle = maxIdle
 	pool.MaxActive = maxActive
 	pool.Wait = true
 	pool.IdleTimeout = 180 * time.Second
 	pool.Dial = dialFunc
-	p.Pool = pool
 
-	return p
+	return &Pool{pool}
 }
 
 func NewRedisWithSentinel(addrs []string, masterName, password string, dbIndex, maxActive, maxIdle int) (p *Pool) {
@@ -87,7 +85,6 @@ func NewRedisWithSentinel(addrs []string, masterName, password string, dbIndex, 
 		}
 	}
 
-	p = &Pool{}
 	var pool = &redis.Pool{}
 	pool.MaxIdle = maxIdle
 	pool.MaxActive = maxActive
@@ -95,9 +92,8 @@ func NewRedisWithSentinel(addrs []string, masterName, password string, dbIndex, 
 	pool.IdleTimeout = 180 * time.Second
 	pool.Dial = dialFunc
 	pool.TestOnBorrow = testOnBorrow
-	p.Pool = pool
 
-	return p
+	return &Pool{pool}
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -141,11 +137,11 @@ func (this *Session) Do(commandName string, args ...interface{}) *Result {
 	if this.c != nil {
 		return result(this.c.Do(commandName, args...))
 	}
-	return result(nil, InvalidConnErr)
+	return result(nil, ErrInvalidConn)
 }
 
 func (this *Session) Send(commandName string, args ...interface{}) *Result {
-	var err = InvalidConnErr
+	var err = ErrInvalidConn
 	if this.c != nil {
 		err = this.c.Send(commandName, args...)
 	}

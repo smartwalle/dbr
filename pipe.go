@@ -4,7 +4,7 @@ func (this *Session) Receive() *Result {
 	if this.c != nil {
 		return result(this.c.Receive())
 	}
-	return result(nil, InvalidConnErr)
+	return result(nil, ErrInvalidConn)
 }
 
 //var p = dbr.NewRedis("127.0.0.1:6379", "", 1, 30, 1)
@@ -24,5 +24,5 @@ func (this *Session) Flush() error {
 	if this.c != nil {
 		return this.c.Flush()
 	}
-	return InvalidConnErr
+	return ErrInvalidConn
 }
