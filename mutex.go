@@ -127,7 +127,7 @@ func (this *Mutex) Lock() error {
 			}
 		}
 
-		until := time.Now().Add(this.expire - time.Now().Sub(start) - time.Duration(int64(float64(this.expire)*this.factor)) + 2*time.Millisecond)
+		until := time.Now().Add(this.expire - time.Now().Sub(start) - time.Duration(float64(this.expire)*this.factor) + 2*time.Millisecond)
 		if n >= this.quorum && time.Now().Before(until) {
 			this.value = value
 			return nil
