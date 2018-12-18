@@ -230,18 +230,13 @@ func Streams(reply interface{}, err error) ([]*StreamInfo, error) {
 				var stream = &StreamInfo{}
 				stream.Key = key
 				stream.Id = id
-				stream.Fields = make([]*StreamField, 0, fLen)
+				stream.Fields = make(map[string]string)
 				sList = append(sList, stream)
 
 				for fIndex := 0; fIndex < fLen/2; fIndex++ {
 					var field = string(fieldList[fIndex*2].([]byte))
 					var value = string(fieldList[fIndex*2+1].([]byte))
-
-					var sf = &StreamField{}
-					sf.Field = field
-					sf.Value = value
-
-					stream.Fields = append(stream.Fields, sf)
+					stream.Fields[field] = value
 				}
 			}
 		}
@@ -324,10 +319,5 @@ func StructToArgs(key string, obj interface{}) redis.Args {
 type StreamInfo struct {
 	Key    string
 	Id     string
-	Fields []*StreamField
-}
-
-type StreamField struct {
-	Field string
-	Value string
+	Fields map[string]string
 }
