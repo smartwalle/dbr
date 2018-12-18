@@ -86,6 +86,14 @@ func (this *Result) Map() (map[string]string, error) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+func (this *Result) Streams() ([]*StreamInfo, error) {
+	if this.Error != nil {
+		return nil, this.Error
+	}
+	return Streams(this.Data, this.Error)
+}
+
+////////////////////////////////////////////////////////////////////////////////
 func (this *Result) MustValues() []interface{} {
 	var r, _ = this.Values()
 	return r
@@ -140,6 +148,12 @@ func (this *Result) MustMap() map[string]string {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+func (this *Result) MustStreams() []*StreamInfo {
+	var r, _ = this.Streams()
+	return r
+}
+
+////////////////////////////////////////////////////////////////////////////////
 func (this *Result) ScanStruct(destination interface{}) error {
 	var err = ScanStruct(this.Data, destination)
 	return err
@@ -184,6 +198,55 @@ func Float64(reply interface{}, err error) (float64, error) {
 
 func Map(reply interface{}, err error) (map[string]string, error) {
 	return redis.StringMap(reply, err)
+}
+
+func Streams(reply interface{}, err error) ([]*StreamInfo, error) {
+	values, err := redis.Values(reply, err)
+	if err != nil {
+		return nil, err
+	}
+
+	var sList []*StreamInfo
+	var kLen = len(values)
+
+	for kIndex := 0; kIndex < kLen; kIndex++ {
+		var keyInfo = values[kIndex].([]interface{})
+
+		var key = string(keyInfo[0].([]byte))
+		var idList = keyInfo[1].([]interface{})
+		var idLen = len(idList)
+
+		sList = make([]*StreamInfo, 0, idLen)
+
+		for idIndex := 0; idIndex < idLen; idIndex++ {
+			var idInfo = idList[idIndex].([]interface{})
+
+			var id = string(idInfo[0].([]byte))
+
+			var fieldList = idInfo[1].([]interface{})
+			var fLen = len(fieldList)
+
+			if fLen > 0 {
+				var stream = &StreamInfo{}
+				stream.Key = key
+				stream.Id = id
+				stream.Fields = make([]*StreamField, 0, fLen)
+				sList = append(sList, stream)
+
+				for fIndex := 0; fIndex < fLen/2; fIndex++ {
+					var field = string(fieldList[fIndex*2].([]byte))
+					var value = string(fieldList[fIndex*2+1].([]byte))
+
+					var sf = &StreamField{}
+					sf.Field = field
+					sf.Value = value
+
+					stream.Fields = append(stream.Fields, sf)
+				}
+			}
+		}
+	}
+	return sList, nil
 }
 
 func MustValues(reply interface{}, err error) []interface{} {
@@ -239,7 +302,11 @@ func MustMap(reply interface{}, err error) map[string]string {
 	return r
 }
 
-////////////////////////////////////////////////////////////////////////////////
+func MustStreams(reply interface{}, err error) []*StreamInfo {
+	var r, _ = Streams(reply, err)
+	return r
+}
+
 func ScanStruct(source, destination interface{}) error {
 	if len(MustValues(source, nil)) == 0 {
 		return errors.New("source argument is nil")
@@ -251,4 +318,16 @@ func ScanStruct(source, destination interface{}) error {
 
 func StructToArgs(key string, obj interface{}) redis.Args {
 	return redis.Args{}.Add(key).AddFlat(obj)
+}
+
+////////////////////////////////////////////////////////////////////////////////
+type StreamInfo struct {
+	Key    string
+	Id     string
+	Fields []*StreamField
+}
+
+type StreamField struct {
+	Field string
+	Value string
 }

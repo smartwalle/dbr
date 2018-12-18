@@ -70,7 +70,7 @@ func (this *Session) MSETNX(params ...interface{}) *Result {
 }
 
 //PSETEX 这个命令和 SETEX 命令相似，但它以毫秒为单位设置 key 的生存时间，而不是像 SETEX 命令那样，以秒为单位。
-func (this *Session) PSETEX(key string, milliseconds int, value interface{}) *Result {
+func (this *Session) PSETEX(key string, milliseconds int64, value interface{}) *Result {
 	return this.Do("PSETEX", key, milliseconds, value)
 }
 
