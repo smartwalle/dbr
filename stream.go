@@ -25,7 +25,7 @@ func (this *Session) XDEL(key string, args ...interface{}) *Result {
 	var ks = make([]interface{}, 0, len(args)+1)
 	ks = append(ks, key)
 	ks = append(ks, args...)
-	return this.Do("XADD", ks...)
+	return this.Do("XDEL", ks...)
 }
 
 func (this *Session) XGROUP(command, key, group string, args ...interface{}) *Result {
