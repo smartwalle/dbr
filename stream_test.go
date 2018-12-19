@@ -45,8 +45,8 @@ func TestSession_XREADGROUP(t *testing.T) {
 
 	for _, s := range sList {
 		fmt.Println(s.Key, s.Id)
-		for _, f := range s.Fields {
-			fmt.Println("--", f.Field, f.Value)
+		for f, v := range s.Fields {
+			fmt.Println("--", f, v)
 		}
 	}
 }
