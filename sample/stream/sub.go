@@ -16,8 +16,8 @@ func main() {
 			var sList = sSess.XREAD(0, 0, "email", "0").MustStreams()
 			for _, s := range sList {
 				fmt.Println("consumer-1", s.Key, s.Id)
-				for _, f := range s.Fields {
-					fmt.Println("--", f.Field, f.Value)
+				for f, v := range s.Fields {
+					fmt.Println("--", f, v)
 				}
 
 				sSess.XDEL("email", s.Id)
