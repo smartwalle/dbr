@@ -13,17 +13,16 @@ func main() {
 		var sSess = pool.GetSession()
 
 		for {
-			var sList = sSess.XREAD(0, 0, "email", "0").MustStreams()
+			var sList = sSess.XREAD(0, 0, "test_key", "0").MustStreams()
 			for _, s := range sList {
 				fmt.Println("consumer-1", s.Key, s.Id)
 				for f, v := range s.Fields {
 					fmt.Println("--", f, v)
 				}
 
-				sSess.XDEL("email", s.Id)
+				sSess.XDEL("test_key", s.Id)
 			}
 		}
 	}()
-
 	select {}
 }
