@@ -5,6 +5,10 @@ import (
 )
 
 func (this *Session) WithBlock(key string, blockValue string, blockSeconds int64) (bool, *Result) {
+	return this.withBlock(key, blockValue, blockSeconds, 2, 500*time.Millisecond)
+}
+
+func (this *Session) withBlock(key string, blockValue string, blockSeconds int64, retryCount int, retryDelay time.Duration) (bool, *Result) {
 	var rResult = this.GET(key)
 	if rResult.Error != nil {
 		return false, rResult
@@ -20,6 +24,14 @@ func (this *Session) WithBlock(key string, blockValue string, blockSeconds int64
 	}
 
 	if rResult.MustString() == blockValue {
+		for i := 0; i < retryCount; i++ {
+			time.Sleep(retryDelay)
+			block, rResult2 := this.withBlock(key, blockValue, blockSeconds, 0, 0)
+			if block == false {
+				return false, rResult2
+			}
+		}
+
 		// 当从 redis 获取到数据，并且数据等于 阻塞 数据的时候，返回阻塞
 		return true, rResult
 	}
