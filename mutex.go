@@ -13,6 +13,11 @@ import (
 // https://github.com/hjr265/redsync.go
 // https://github.com/go-redsync/redsync
 
+const (
+	kDefaultRetryCount = 32
+	kDefaultRetryDelay = 512 * time.Millisecond
+)
+
 var ErrLockFailed = errors.New("dbr: failed to acquire lock")
 
 // --------------------------------------------------------------------------------
@@ -56,7 +61,7 @@ func WithRetryDelay(delay time.Duration) Option {
 func WithRetryCount(count int) Option {
 	return optionFunc(func(m *Mutex) {
 		if count <= 0 {
-			count = 32
+			count = kDefaultRetryCount
 		}
 		m.retryCount = count
 	})
@@ -94,8 +99,8 @@ func NewMutex(pools []*Pool, name string, opts ...Option) *Mutex {
 	var mu = &Mutex{}
 	mu.name = name
 	mu.expire = 10 * time.Second
-	mu.retryCount = 32
-	mu.retryDelay = 512 * time.Millisecond
+	mu.retryCount = kDefaultRetryCount
+	mu.retryDelay = kDefaultRetryDelay
 	mu.factor = 0.01
 	mu.quorum = len(pools)/2 + 1
 	mu.pools = pools
@@ -116,7 +121,7 @@ func (this *Mutex) Lock() error {
 		return err
 	}
 
-	for i := 0; i < this.retryCount; i++ {
+	for i := 0; i <= this.retryCount; i++ {
 		if i != 0 {
 			time.Sleep(this.retryDelay)
 		}
