@@ -55,6 +55,9 @@ func WithRetryDelay(delay time.Duration) Option {
 
 func WithRetryCount(count int) Option {
 	return optionFunc(func(m *Mutex) {
+		if count <= 0 {
+			count = 32
+		}
 		m.retryCount = count
 	})
 }
