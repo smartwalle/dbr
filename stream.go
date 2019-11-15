@@ -1,10 +1,10 @@
 package dbr
 
 // XACK XACK key group ID [ID ...]
-func (this *Session) XACK(key, group string, args ...interface{}) *Result {
-	var ks = make([]interface{}, 0, len(args)+2)
+func (this *Session) XACK(key, group string, ids ...interface{}) *Result {
+	var ks = make([]interface{}, 0, len(ids)+2)
 	ks = append(ks, key, group)
-	ks = append(ks, args...)
+	ks = append(ks, ids...)
 	return this.Do("XACK", ks...)
 }
 
@@ -71,24 +71,24 @@ func (this *Session) XPENDING(key, group string, args ...interface{}) *Result {
 }
 
 // XREAD XREAD [COUNT count] [BLOCK milliseconds] STREAMS key [key ...] ID [ID ...]
-func (this *Session) XREAD(count int, milliseconds int64, args ...interface{}) *Result {
-	var ks = make([]interface{}, 0, len(args)+5)
+func (this *Session) XREAD(count int, milliseconds int64, keysAndIds ...interface{}) *Result {
+	var ks = make([]interface{}, 0, len(keysAndIds)+5)
 	ks = append(ks, "COUNT", count)
 	ks = append(ks, "BLOCK", milliseconds)
 	ks = append(ks, "STREAMS")
-	ks = append(ks, args...)
+	ks = append(ks, keysAndIds...)
 	return this.Do("XREAD", ks...)
 }
 
 // XREADGROUP XREADGROUP GROUP group consumer [COUNT count] [BLOCK milliseconds] [NOACK] STREAMS key [key ...] ID [ID ...]
 // >    表示从当前消费组的last_delivered_id后面开始读
 // 0-0  表示读取所有的PEL消息以及自last_delivered_id之后的新消息
-func (this *Session) XREADGROUP(group, consumer string, count int, milliseconds int64, args ...interface{}) *Result {
-	var ks = make([]interface{}, 0, len(args)+8)
+func (this *Session) XREADGROUP(group, consumer string, count int, milliseconds int64, keysAndIds ...interface{}) *Result {
+	var ks = make([]interface{}, 0, len(keysAndIds)+8)
 	ks = append(ks, "GROUP", group, consumer)
 	ks = append(ks, "COUNT", count)
 	ks = append(ks, "BLOCK", milliseconds)
 	ks = append(ks, "STREAMS")
-	ks = append(ks, args...)
+	ks = append(ks, keysAndIds...)
 	return this.Do("XREADGROUP", ks...)
 }
