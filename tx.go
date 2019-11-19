@@ -28,7 +28,7 @@ func (this *Session) BeginTx() *Result {
 }
 
 func (this *Session) Rollback() *Result {
-	return this.Send("DISCARD")
+	return this.Do("DISCARD")
 }
 
 func (this *Session) Commit() *Result {
