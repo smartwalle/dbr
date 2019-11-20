@@ -123,6 +123,8 @@ type Pool interface {
 	GetSession() *Session
 
 	Release(s *Session)
+
+	Close() error
 }
 
 type redisPool struct {
@@ -136,6 +138,10 @@ func (this *redisPool) GetSession() *Session {
 
 func (this *redisPool) Release(s *Session) {
 	s.c.Close()
+}
+
+func (this *redisPool) Close() error {
+	return this.Pool.Close()
 }
 
 ////////////////////////////////////////////////////////////////////////////////
