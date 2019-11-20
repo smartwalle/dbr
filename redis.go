@@ -56,7 +56,7 @@ func DialUseTLS(useTLS bool) redis.DialOption {
 }
 
 // --------------------------------------------------------------------------------
-func NewRedis(addr string, maxActive, maxIdle int, opts ...redis.DialOption) (p *Pool) {
+func NewRedis(addr string, maxActive, maxIdle int, opts ...redis.DialOption) Pool {
 	var dialFunc = func() (c redis.Conn, err error) {
 		c, err = redis.Dial("tcp", addr, opts...)
 		if err != nil {
@@ -72,10 +72,10 @@ func NewRedis(addr string, maxActive, maxIdle int, opts ...redis.DialOption) (p 
 	pool.IdleTimeout = 180 * time.Second
 	pool.Dial = dialFunc
 
-	return &Pool{pool}
+	return &redisPool{pool}
 }
 
-func NewRedisWithSentinel(addrs []string, masterName string, maxActive, maxIdle int, opts ...redis.DialOption) (p *Pool) {
+func NewRedisWithSentinel(addrs []string, masterName string, maxActive, maxIdle int, opts ...redis.DialOption) Pool {
 	var s = &sentinel.Sentinel{
 		Addrs:      addrs,
 		MasterName: masterName,
@@ -115,25 +115,31 @@ func NewRedisWithSentinel(addrs []string, masterName string, maxActive, maxIdle 
 	pool.Dial = dialFunc
 	pool.TestOnBorrow = testOnBorrow
 
-	return &Pool{pool}
+	return &redisPool{pool}
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-type Pool struct {
+type Pool interface {
+	GetSession() *Session
+
+	Release(s *Session)
+}
+
+type redisPool struct {
 	*redis.Pool
 }
 
-func (this *Pool) GetSession() *Session {
+func (this *redisPool) GetSession() *Session {
 	var c = this.Pool.Get()
 	return NewSession(c)
 }
 
-func (this *Pool) Release(s *Session) {
+func (this *redisPool) Release(s *Session) {
 	s.c.Close()
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-func NewSession(c Conn) *Session {
+func NewSession(c redis.Conn) *Session {
 	if c == nil {
 		return nil
 	}
@@ -141,7 +147,7 @@ func NewSession(c Conn) *Session {
 }
 
 type Session struct {
-	c Conn
+	c redis.Conn
 }
 
 func (this *Session) Conn() redis.Conn {
@@ -171,12 +177,7 @@ func (this *Session) Send(commandName string, args ...interface{}) *Result {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-type Conn interface {
-	redis.Conn
-}
-
-////////////////////////////////////////////////////////////////////////////////
-const k_REDIS_KEY = "redis_conn"
+const kRedisSession = "redis_session"
 
 type Context interface {
 	Set(key string, value interface{})
@@ -185,9 +186,9 @@ type Context interface {
 }
 
 func FromContext(ctx Context) *Session {
-	return ctx.MustGet(k_REDIS_KEY).(*Session)
+	return ctx.MustGet(kRedisSession).(*Session)
 }
 
 func ToContext(ctx Context, s *Session) {
-	ctx.Set(k_REDIS_KEY, s)
+	ctx.Set(kRedisSession, s)
 }

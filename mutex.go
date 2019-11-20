@@ -22,10 +22,10 @@ var ErrLockFailed = errors.New("dbr: failed to acquire lock")
 
 // --------------------------------------------------------------------------------
 type RedSync struct {
-	pools []*Pool
+	pools []Pool
 }
 
-func NewRedSync(pools ...*Pool) *RedSync {
+func NewRedSync(pools ...Pool) *RedSync {
 	var rs = &RedSync{}
 	rs.pools = pools
 	return rs
@@ -92,10 +92,10 @@ type Mutex struct {
 	retryCount int
 	quorum     int
 	factor     float64
-	pools      []*Pool
+	pools      []Pool
 }
 
-func NewMutex(pools []*Pool, name string, opts ...Option) *Mutex {
+func NewMutex(pools []Pool, name string, opts ...Option) *Mutex {
 	var mu = &Mutex{}
 	mu.name = name
 	mu.expire = 10 * time.Second
@@ -170,7 +170,7 @@ func (this *Mutex) getValue() (string, error) {
 	return base64.StdEncoding.EncodeToString(b), nil
 }
 
-func (this *Mutex) acquire(p *Pool, value string) bool {
+func (this *Mutex) acquire(p Pool, value string) bool {
 	var rSess = p.GetSession()
 	defer rSess.Close()
 
@@ -186,7 +186,7 @@ var unlockScript = redis.NewScript(1, `
 	end
 `)
 
-func (this *Mutex) release(p *Pool, value string) bool {
+func (this *Mutex) release(p Pool, value string) bool {
 	var rSess = p.GetSession()
 	defer rSess.Close()
 
@@ -215,7 +215,7 @@ var touchScript = redis.NewScript(1, `
 	end
 `)
 
-func (this *Mutex) touch(pool *Pool, value string, expire int) bool {
+func (this *Mutex) touch(pool Pool, value string, expire int) bool {
 	var rSess = pool.GetSession()
 	defer rSess.Close()
 
