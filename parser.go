@@ -1,3 +1,7 @@
+// Copyright (C) 2012 Rob Figueiredo. All rights reserved.
+// Use of this source code is governed by a MIT license that can be found
+// https://github.com/robfig/cron/blob/master/LICENSE
+
 package dbr
 
 // https://github.com/robfig/cron

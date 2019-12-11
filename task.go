@@ -1,6 +1,7 @@
 package dbr
 
 import (
+	"errors"
 	"fmt"
 	"github.com/gomodule/redigo/redis"
 	"strings"
@@ -9,10 +10,31 @@ import (
 )
 
 const (
-	infix = "task:manager"
+	defaultPrefix = "tm"
+	defaultInfix  = "task:manager"
+)
+
+var (
+	ErrTaskExists = errors.New("dbr: task already exists")
 )
 
 type TaskHandler func(name string)
+
+type TaskOption interface {
+	Apply(*TaskManager)
+}
+
+type taskOptionFunc func(*TaskManager)
+
+func (f taskOptionFunc) Apply(tm *TaskManager) {
+	f(tm)
+}
+
+func WithTaskRedSync(redSync *RedSync) TaskOption {
+	return taskOptionFunc(func(tm *TaskManager) {
+		tm.redSync = redSync
+	})
+}
 
 type TaskManager struct {
 	prefix        string
@@ -40,22 +62,32 @@ type Task struct {
 	handler  TaskHandler
 }
 
-func NewTaskManager(prefix string, pool Pool, redSync *RedSync) *TaskManager {
+func NewTaskManager(key string, pool Pool, opts ...TaskOption) *TaskManager {
 	var m = &TaskManager{}
-	if prefix == "" {
-		prefix = "tm"
+	m.rPool = pool
+
+	key = strings.TrimSpace(key)
+	if key == "" {
+		key = defaultPrefix
 	}
-	m.prefix = fmt.Sprintf("%s:%s", prefix, infix)
+	m.prefix = key
+
+	for _, opt := range opts {
+		opt.Apply(m)
+	}
+
+	if m.redSync == nil {
+		m.redSync = NewRedSync(pool)
+	}
+
+	m.prefix = fmt.Sprintf("%s:%s", m.prefix, defaultInfix)
 	m.eventPrefix = fmt.Sprintf("%s:event:", m.prefix)
 	m.mutexPrefix = fmt.Sprintf("%s:mutex:", m.prefix)
 	m.consumePrefix = fmt.Sprintf("%s:consume:", m.prefix)
 
-	m.rPool = pool
-	m.redSync = redSync
-
-	m.streamKey = fmt.Sprintf("%s:%s:stream", prefix, infix)
-	m.streamGroup = fmt.Sprintf("%s:%s:group", prefix, infix)
-	m.streamConsumer = fmt.Sprintf("%s:%s:consumer", prefix, infix)
+	m.streamKey = fmt.Sprintf("%s:stream", m.prefix)
+	m.streamGroup = fmt.Sprintf("%s:group", m.prefix)
+	m.streamConsumer = fmt.Sprintf("%s:consumer", m.prefix)
 	m.taskPool = make(map[string]*Task)
 
 	m.location = time.Local
@@ -70,8 +102,8 @@ func (this *TaskManager) buildEventKey(name string) string {
 	return fmt.Sprintf("%s%s", this.eventPrefix, name)
 }
 
-func (this *TaskManager) buildMutexKey(name string, now int64) string {
-	return fmt.Sprintf("%s%s:%d", this.mutexPrefix, name, now)
+func (this *TaskManager) buildMutexKey(name string) string {
+	return fmt.Sprintf("%s%s", this.mutexPrefix, name)
 }
 
 func (this *TaskManager) buildConsumeKey(name string) string {
@@ -91,8 +123,6 @@ func (this *TaskManager) subscribe() {
 		switch data := pConn.Receive().(type) {
 		case error:
 		case redis.Message:
-			var now = time.Now().Unix()
-
 			var channels = strings.Split(data.Channel, this.eventPrefix)
 			if len(channels) < 2 {
 				continue
@@ -104,21 +134,7 @@ func (this *TaskManager) subscribe() {
 
 			var action = string(data.Data)
 			if action == "expired" {
-				var mutexKey = this.buildMutexKey(taskName, now)
-				var mu = this.redSync.NewMutex(mutexKey, WithRetryCount(4))
-				if err := mu.Lock(); err != nil {
-					continue
-				}
-
-				// 59 秒以内同一个任务只能被处理一次
-				var consumeKey = this.buildConsumeKey(taskName)
-				var muSess = this.rPool.GetSession()
-				if rResult := muSess.SET(consumeKey, now, "EX", 59, "NX"); rResult.MustString() == "OK" {
-					this.postTask(taskName)
-				}
-				muSess.Close()
-
-				mu.Unlock()
+				this.postTask(taskName)
 			}
 		}
 	}
@@ -143,25 +159,47 @@ func (this *TaskManager) consumerTask(key, group, consumer string) {
 		}
 
 		for _, stream := range streams {
+			rSess.XACK(key, group, stream.Id)
+			rSess.XDEL(key, stream.Id)
+
 			var taskName = stream.Fields["task_name"]
 			if taskName == "" {
-				rSess.XACK(key, group, stream.Id)
-				rSess.XDEL(key, stream.Id)
 				continue
 			}
 
-			this.mu.RLock()
-			var task = this.taskPool[taskName]
-			this.mu.RUnlock()
-
-			if task != nil && task.handler != nil {
-				go task.handler(task.name)
-				rSess.XACK(key, group, stream.Id)
-				rSess.XDEL(key, stream.Id)
-				this.runTask(task)
-			}
+			go this.handleTask(taskName)
 		}
 	}
+}
+
+func (this *TaskManager) handleTask(taskName string) {
+	this.mu.RLock()
+	var task = this.taskPool[taskName]
+	this.mu.RUnlock()
+
+	if task == nil || task.handler == nil {
+		return
+	}
+
+	var now = time.Now().Unix()
+	var mutexKey = this.buildMutexKey(task.name)
+	var redMu = this.redSync.NewMutex(mutexKey, WithRetryCount(4))
+	if err := redMu.Lock(); err != nil {
+		return
+	}
+
+	// 59 秒以内同一个任务只能被处理一次
+	var consumeKey = this.buildConsumeKey(task.name)
+	var muSess = this.rPool.GetSession()
+	if rResult := muSess.SET(consumeKey, now, "EX", 59, "NX"); rResult.MustString() == "OK" {
+		go task.handler(task.name)
+	}
+	muSess.Close()
+
+	redMu.Unlock()
+
+	// 重新激活任务
+	this.runTask(task)
 }
 
 func (this *TaskManager) AddTask(name, spec string, handler TaskHandler) error {
@@ -173,6 +211,13 @@ func (this *TaskManager) AddTask(name, spec string, handler TaskHandler) error {
 	if err != nil {
 		return err
 	}
+
+	this.mu.RLock()
+	if _, ok := this.taskPool[name]; ok {
+		this.mu.RUnlock()
+		return ErrTaskExists
+	}
+	this.mu.RUnlock()
 
 	var task = &Task{}
 	task.name = name
