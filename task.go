@@ -10,8 +10,8 @@ import (
 )
 
 const (
-	defaultPrefix = "tm"
-	defaultInfix  = "task:manager"
+	defaultKey   = "default"
+	defaultInfix = "task:manager"
 )
 
 var (
@@ -68,7 +68,7 @@ func NewTaskManager(key string, pool Pool, opts ...TaskOption) *TaskManager {
 
 	key = strings.TrimSpace(key)
 	if key == "" {
-		key = defaultPrefix
+		key = defaultKey
 	}
 	m.prefix = key
 
@@ -80,7 +80,7 @@ func NewTaskManager(key string, pool Pool, opts ...TaskOption) *TaskManager {
 		m.redSync = NewRedSync(pool)
 	}
 
-	m.prefix = fmt.Sprintf("%s:%s", m.prefix, defaultInfix)
+	m.prefix = fmt.Sprintf("%s:%s", defaultInfix, m.prefix)
 	m.eventPrefix = fmt.Sprintf("%s:event:", m.prefix)
 	m.mutexPrefix = fmt.Sprintf("%s:mutex:", m.prefix)
 	m.consumePrefix = fmt.Sprintf("%s:consume:", m.prefix)
@@ -181,7 +181,6 @@ func (this *TaskManager) handleTask(taskName string) {
 		return
 	}
 
-	var now = time.Now().Unix()
 	var mutexKey = this.buildMutexKey(task.name)
 	var redMu = this.redSync.NewMutex(mutexKey, WithRetryCount(4))
 	if err := redMu.Lock(); err != nil {
@@ -191,7 +190,7 @@ func (this *TaskManager) handleTask(taskName string) {
 	// 59 秒以内同一个任务只能被处理一次
 	var consumeKey = this.buildConsumeKey(task.name)
 	var muSess = this.rPool.GetSession()
-	if rResult := muSess.SET(consumeKey, now, "EX", 59, "NX"); rResult.MustString() == "OK" {
+	if rResult := muSess.SET(consumeKey, time.Now().Unix(), "PX", 59000, "NX"); rResult.MustString() == "OK" {
 		go task.handler(task.name)
 	}
 	muSess.Close()
@@ -235,13 +234,12 @@ func (this *TaskManager) runTask(task *Task) error {
 	var now = time.Now().In(this.location)
 	var next = task.schedule.Next(now).In(this.location)
 
-	var ttl = next.Unix() - now.Unix()
+	var ttl = (next.UnixNano() - now.UnixNano()) / 1e6
 
 	var rSess = this.rPool.GetSession()
-	defer rSess.Close()
-
 	var key = this.buildEventKey(task.name)
-	var rResult = rSess.SET(key, time.Now().Unix(), "EX", ttl, "NX")
+	var rResult = rSess.SET(key, now, "PX", ttl, "NX")
+	rSess.Close()
 	return rResult.Error
 }
 
