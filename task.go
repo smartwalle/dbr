@@ -187,18 +187,22 @@ func (this *TaskManager) handleTask(taskName string) {
 		return
 	}
 
-	// 59 秒以内同一个任务只能被处理一次
+	// 重新激活任务
+	var next, _ = this.runTask(task)
+	var expiresIn int64 = 59000
+	if next-expiresIn < 1000 {
+		expiresIn = next - 1000
+	}
+
+	// 同一个任务在一分钟（最大时间）内只能被处理一次
 	var consumeKey = this.buildConsumeKey(task.name)
-	var muSess = this.rPool.GetSession()
-	if rResult := muSess.SET(consumeKey, time.Now().Unix(), "PX", 59000, "NX"); rResult.MustString() == "OK" {
+	var rSess = this.rPool.GetSession()
+	if rResult := rSess.SET(consumeKey, time.Now().Unix(), "PX", expiresIn, "NX"); rResult.MustString() == "OK" {
 		go task.handler(task.name)
 	}
-	muSess.Close()
+	rSess.Close()
 
 	redMu.Unlock()
-
-	// 重新激活任务
-	this.runTask(task)
 }
 
 func (this *TaskManager) AddTask(name, spec string, handler TaskHandler) error {
@@ -227,20 +231,25 @@ func (this *TaskManager) AddTask(name, spec string, handler TaskHandler) error {
 	this.taskPool[name] = task
 	this.mu.Unlock()
 
-	return this.runTask(task)
+	_, err = this.runTask(task)
+	return err
 }
 
-func (this *TaskManager) runTask(task *Task) error {
-	var now = time.Now().In(this.location)
-	var next = task.schedule.Next(now).In(this.location)
-
-	var ttl = (next.UnixNano() - now.UnixNano()) / 1e6
-
+func (this *TaskManager) runTask(task *Task) (next int64, err error) {
 	var rSess = this.rPool.GetSession()
 	var key = this.buildEventKey(task.name)
-	var rResult = rSess.SET(key, now, "PX", ttl, "NX")
+
+	var now = time.Now().In(this.location)
+	var nextTime = task.schedule.Next(now).In(this.location)
+	next = (nextTime.UnixNano() - now.UnixNano()) / 1e6
+
+	var rResult = rSess.SET(key, now, "PX", next, "NX")
 	rSess.Close()
-	return rResult.Error
+
+	if rResult.Error != nil {
+		return -1, rResult.Error
+	}
+	return next, nil
 }
 
 func (this *TaskManager) RemoveTask(taskName string) {

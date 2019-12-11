@@ -12,7 +12,7 @@ func main() {
 	var pool2 = dbr.NewRedis("192.168.1.77:6379", 10, 2, redis.DialDatabase(15))
 	var rs = dbr.NewRedSync(pool, pool2)
 
-	var key = "aa"
+	var key = "bb"
 
 	var tm = dbr.NewTaskManager(key, pool, dbr.WithTaskRedSync(rs))
 
