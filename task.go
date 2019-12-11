@@ -36,6 +36,12 @@ func WithTaskRedSync(redSync *RedSync) TaskOption {
 	})
 }
 
+func WithTaskLocation(location *time.Location) TaskOption {
+	return taskOptionFunc(func(tm *TaskManager) {
+		tm.location = location
+	})
+}
+
 type TaskManager struct {
 	prefix        string
 	eventPrefix   string
@@ -71,6 +77,7 @@ func NewTaskManager(key string, pool Pool, opts ...TaskOption) *TaskManager {
 		key = defaultKey
 	}
 	m.prefix = key
+	m.location = time.Local
 
 	for _, opt := range opts {
 		opt.Apply(m)
@@ -90,7 +97,6 @@ func NewTaskManager(key string, pool Pool, opts ...TaskOption) *TaskManager {
 	m.streamConsumer = fmt.Sprintf("%s:consumer", m.prefix)
 	m.taskPool = make(map[string]*Task)
 
-	m.location = time.Local
 	m.parser = NewParser(Minute | Hour | Dom | Month | Dow | Descriptor)
 
 	go m.subscribe()
