@@ -197,7 +197,7 @@ func (this *TaskManager) handleTask(taskName string) {
 	// 同一个任务在一分钟（最大时间）内只能被处理一次
 	var consumeKey = this.buildConsumeKey(task.name)
 	var rSess = this.rPool.GetSession()
-	if rResult := rSess.SET(consumeKey, time.Now().Unix(), "PX", expiresIn, "NX"); rResult.MustString() == "OK" {
+	if rResult := rSess.SET(consumeKey, time.Now(), "PX", expiresIn, "NX"); rResult.MustString() == "OK" {
 		go task.handler(task.name)
 	}
 	rSess.Close()
@@ -243,7 +243,7 @@ func (this *TaskManager) runTask(task *Task) (next int64, err error) {
 	var nextTime = task.schedule.Next(now).In(this.location)
 	next = (nextTime.UnixNano() - now.UnixNano()) / 1e6
 
-	var rResult = rSess.SET(key, now, "PX", next, "NX")
+	var rResult = rSess.SET(key, nextTime, "PX", next, "NX")
 	rSess.Close()
 
 	if rResult.Error != nil {
@@ -257,8 +257,12 @@ func (this *TaskManager) RemoveTask(taskName string) {
 		return
 	}
 
+	this.mu.Lock()
+	delete(this.taskPool, taskName)
+	this.mu.Unlock()
+
 	var rSess = this.rPool.GetSession()
-	rSess.Close()
+	defer rSess.Close()
 
 	rSess.BeginTx()
 	rSess.Send("DEL", this.buildEventKey(taskName))
