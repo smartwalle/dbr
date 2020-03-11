@@ -1,7 +1,6 @@
 package dbr
 
 import (
-	"fmt"
 	"github.com/gomodule/redigo/redis"
 	"time"
 )
@@ -25,12 +24,10 @@ func (this *Session) Sub(onMessage func(channel, data string) error, channels ..
 		for {
 			switch v := psc.Receive().(type) {
 			case redis.Message:
-				fmt.Println("ssss")
 				if err := onMessage(v.Channel, string(v.Data)); err != nil {
 					done <- err
 				}
 			case redis.Subscription:
-				fmt.Println(v.Count)
 				if v.Count <= 0 {
 					done <- nil
 				}
@@ -39,21 +36,21 @@ func (this *Session) Sub(onMessage func(channel, data string) error, channels ..
 			}
 		}
 	}()
-//
-//	var ticker = time.NewTicker(healthCheckPeriod)
-//	defer ticker.Stop()
-//
-//loop:
-//	for {
-//		select {
-//		case <-ticker.C:
-//			if err := psc.Ping(""); err != nil {
-//				break loop
-//			}
-//		case err := <-done:
-//			return err
-//		}
-//	}
+	//
+	//	var ticker = time.NewTicker(healthCheckPeriod)
+	//	defer ticker.Stop()
+	//
+	//loop:
+	//	for {
+	//		select {
+	//		case <-ticker.C:
+	//			if err := psc.Ping(""); err != nil {
+	//				break loop
+	//			}
+	//		case err := <-done:
+	//			return err
+	//		}
+	//	}
 
 	return <-done
 }
