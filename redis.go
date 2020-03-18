@@ -120,6 +120,8 @@ func NewRedisWithSentinel(addrs []string, masterName string, maxActive, maxIdle 
 
 ////////////////////////////////////////////////////////////////////////////////
 type Pool interface {
+	GetPool() *redis.Pool
+
 	GetSession() *Session
 
 	Release(s *Session)
@@ -129,6 +131,10 @@ type Pool interface {
 
 type redisPool struct {
 	*redis.Pool
+}
+
+func (this *redisPool) GetPool() *redis.Pool {
+	return this.Pool
 }
 
 func (this *redisPool) GetSession() *Session {
