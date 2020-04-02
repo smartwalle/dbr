@@ -244,6 +244,26 @@ func (this *Cron) Add(name, spec string, handler CronHandler) error {
 	return err
 }
 
+func (this *Cron) UpdateNextTime(name string, nextTime time.Time) error {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return nil
+	}
+
+	var key = this.buildEventKey(name)
+	var newTime = nextTime.In(this.location)
+	var next = (newTime.UnixNano() - time.Now().UnixNano()) / 1e6
+
+	var rSess = this.rPool.GetSession()
+	var rResult = rSess.SET(key, newTime, "PX", next, "XX")
+	rSess.Close()
+
+	if rResult.Error != nil {
+		return rResult.Error
+	}
+	return nil
+}
+
 func (this *Cron) runJob(job *Job) (next int64, err error) {
 	var rSess = this.rPool.GetSession()
 	var key = this.buildEventKey(job.name)
