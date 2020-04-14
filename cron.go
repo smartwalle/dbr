@@ -149,10 +149,37 @@ func (this *Cron) subscribe() {
 	}
 }
 
-func (this *Cron) postJob(jobName string) {
+func (this *Cron) postJob(name string) {
+	this.mu.RLock()
+	var job = this.jobPool[name]
+	this.mu.RUnlock()
+
+	if job == nil || job.handler == nil {
+		return
+	}
+
+	var mKey = this.buildMutexKey(job.name)
+	var mRed = this.redSync.NewMutex(mKey, WithRetryCount(4))
+	if err := mRed.Lock(); err != nil {
+		return
+	}
+
+	// 重新激活任务
+	var next, _ = this.runJob(job)
+	var expiresIn int64 = 59000
+	if next-expiresIn < 1000 {
+		expiresIn = next - 1000
+	}
+
+	// 同一个任务在一分钟（最大时间）内只能被处理一次
+	var consumeKey = this.buildConsumeKey(job.name)
 	var rSess = this.rPool.GetSession()
-	defer rSess.Close()
-	rSess.XADD(this.streamKey, 0, "*", "job_name", jobName)
+	if rResult := rSess.SET(consumeKey, time.Now(), "PX", expiresIn, "NX"); rResult.MustString() == "OK" {
+		rSess.XADD(this.streamKey, 0, "*", "job_name", name)
+	}
+	rSess.Close()
+
+	mRed.Unlock()
 }
 
 func (this *Cron) consumerJob(key, group, consumer string) {
@@ -171,12 +198,12 @@ func (this *Cron) consumerJob(key, group, consumer string) {
 			rSess.XACK(key, group, stream.Id)
 			rSess.XDEL(key, stream.Id)
 
-			var jobName = stream.Fields["job_name"]
-			if jobName == "" {
+			var name = stream.Fields["job_name"]
+			if name == "" {
 				continue
 			}
 
-			go this.handleJob(jobName)
+			go this.handleJob(name)
 		}
 	}
 }
@@ -190,28 +217,7 @@ func (this *Cron) handleJob(name string) {
 		return
 	}
 
-	var mutexKey = this.buildMutexKey(job.name)
-	var redMu = this.redSync.NewMutex(mutexKey, WithRetryCount(4))
-	if err := redMu.Lock(); err != nil {
-		return
-	}
-
-	// 重新激活任务
-	var next, _ = this.runJob(job)
-	var expiresIn int64 = 59000
-	if next-expiresIn < 1000 {
-		expiresIn = next - 1000
-	}
-
-	// 同一个任务在一分钟（最大时间）内只能被处理一次
-	var consumeKey = this.buildConsumeKey(job.name)
-	var rSess = this.rPool.GetSession()
-	if rResult := rSess.SET(consumeKey, time.Now(), "PX", expiresIn, "NX"); rResult.MustString() == "OK" {
-		go job.handler(job.name)
-	}
-	rSess.Close()
-
-	redMu.Unlock()
+	job.handler(job.name)
 }
 
 func (this *Cron) Add(name, spec string, handler CronHandler) error {
