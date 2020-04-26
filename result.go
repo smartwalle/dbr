@@ -50,6 +50,13 @@ func (this *Result) Int64() (int64, error) {
 	return Int64(this.Data, this.Error)
 }
 
+func (this *Result) Int64s() ([]int64, error) {
+	if this.Error != nil {
+		return nil, this.Error
+	}
+	return Int64s(this.Data, this.Error)
+}
+
 func (this *Result) Bool() (bool, error) {
 	if this.Error != nil {
 		return false, this.Error
@@ -119,6 +126,11 @@ func (this *Result) MustInt64() int64 {
 	return r
 }
 
+func (this *Result) MustInt64s() []int64 {
+	var r, _ = this.Int64s()
+	return r
+}
+
 func (this *Result) MustBool() bool {
 	var r, _ = this.Bool()
 	return r
@@ -178,6 +190,10 @@ func Ints(reply interface{}, err error) ([]int, error) {
 
 func Int64(reply interface{}, err error) (int64, error) {
 	return redis.Int64(reply, err)
+}
+
+func Int64s(reply interface{}, err error) ([]int64, error) {
+	return redis.Int64s(reply, err)
 }
 
 func Bool(reply interface{}, err error) (bool, error) {
@@ -266,6 +282,11 @@ func MustInts(reply interface{}, err error) []int {
 
 func MustInt64(reply interface{}, err error) int64 {
 	var r, _ = Int64(reply, err)
+	return r
+}
+
+func MustInt64s(reply interface{}, err error) []int64 {
+	var r, _ = Int64s(reply, err)
 	return r
 }
 
