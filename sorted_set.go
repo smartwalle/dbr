@@ -22,7 +22,7 @@ func (this *Session) ZCOUNT(key string, min, max float64) *Result {
 }
 
 //ZINCRBY 为有序集 key 的成员 member 的 score 值加上增量 increment 。
-func (this *Session) ZINCRBY(key string, increment float64, member string) *Result {
+func (this *Session) ZINCRBY(key string, increment float64, member interface{}) *Result {
 	return this.Do("ZINCRBY", key, increment, member)
 }
 
@@ -51,12 +51,12 @@ func (this *Session) ZRANGEBYSCORE(key string, min, max float64, options ...inte
 }
 
 //ZRANK 返回有序集 key 中成员 member 的排名。其中有序集成员按 score 值递增(从小到大)顺序排列。
-func (this *Session) ZRANK(key, member string) *Result {
+func (this *Session) ZRANK(key, member interface{}) *Result {
 	return this.Do("ZRANK", key, member)
 }
 
 //ZREM 移除有序集 key 中的一个或多个成员，不存在的成员将被忽略。
-func (this *Session) ZREM(key string, members ...string) *Result {
+func (this *Session) ZREM(key string, members ...interface{}) *Result {
 	var ps []interface{}
 	ps = append(ps, key)
 	for _, m := range members {
@@ -100,12 +100,12 @@ func (this *Session) ZREVRANGEBYSCORE(key string, max, min float64, options ...i
 }
 
 //ZREVRANK 返回有序集 key 中成员 member 的排名。其中有序集成员按 score 值递减(从大到小)排序。
-func (this *Session) ZREVRANK(key, member string) *Result {
+func (this *Session) ZREVRANK(key, member interface{}) *Result {
 	return this.Do("ZREVRANK", key, member)
 }
 
 //ZSCORE 返回有序集 key 中，成员 member 的 score 值。
-func (this *Session) ZSCORE(key, member string) *Result {
+func (this *Session) ZSCORE(key, member interface{}) *Result {
 	return this.Do("ZSCORE", key, member)
 }
 
