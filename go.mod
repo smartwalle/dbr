@@ -1,8 +1,5 @@
 module github.com/smartwalle/dbr
 
-go 1.12
+go 1.13
 
-require (
-	github.com/FZambia/sentinel v1.0.0
-	github.com/gomodule/redigo v2.0.0+incompatible
-)
+require github.com/go-redis/redis/v8 v8.11.5 // indirect
