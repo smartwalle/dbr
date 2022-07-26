@@ -1,4 +1,4 @@
-module github.com/smartwalle/dbr/sample
+module github.com/smartwalle/dbr/examples
 
 go 1.13
 
