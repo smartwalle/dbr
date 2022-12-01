@@ -15,13 +15,13 @@ type Client struct {
 	*redis.Client
 }
 
-func New(addr, password string, db, poolSize, minIdleConn int) (UniversalClient, error) {
+func New(addr, password string, db, poolSize, minIdleConns int) (UniversalClient, error) {
 	var opt = &redis.Options{}
 	opt.Addr = addr
 	opt.Password = password
 	opt.DB = db
 	opt.PoolSize = poolSize
-	opt.MinIdleConns = minIdleConn
+	opt.MinIdleConns = minIdleConns
 	return NewWithOption(opt)
 }
 
