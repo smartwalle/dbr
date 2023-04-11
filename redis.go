@@ -12,7 +12,7 @@ type UniversalClient interface {
 }
 
 type Client struct {
-	*redis.Client
+	redis.UniversalClient
 }
 
 func New(addr, password string, db, poolSize, minIdleConns int) (UniversalClient, error) {
@@ -32,5 +32,5 @@ func NewWithOption(opt *redis.Options) (UniversalClient, error) {
 		return nil, err
 	}
 
-	return &Client{Client: rClient}, nil
+	return &Client{UniversalClient: rClient}, nil
 }
