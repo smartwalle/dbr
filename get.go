@@ -36,19 +36,19 @@ func WithRetryDelay(retryDelay time.Duration) BlockOption {
 // 当第一个返回值为 true 时，表示该 key 已经被标记为无效 key 或者访问 Redis 发生错误，调用方应该终止后续操作，比如从数据库查询。
 // 当第一个返回值为 false 时，表示该 key 本轮访问有效，调用方应该根据第二个返回值决定后续操作流程，比如直接返回或者从数据库查询并重写 Redis 中该 key 的值。
 func (this *Client) GetBlock(ctx context.Context, key string, opts ...BlockOption) (bool, string, error) {
-	var opt = &blockOptions{
+	var nOpt = &blockOptions{
 		BlockValue: "block-null",
 		BlockTime:  time.Minute * 5,
 		RetryDelay: time.Millisecond * 200,
 	}
 
-	for _, nOpt := range opts {
-		if nOpt != nil {
-			nOpt(opt)
+	for _, opt := range opts {
+		if opt != nil {
+			opt(nOpt)
 		}
 	}
 
-	return this.getBlock(ctx, key, opt)
+	return this.getBlock(ctx, key, nOpt)
 }
 
 func (this *Client) getBlock(ctx context.Context, key string, opt *blockOptions) (bool, string, error) {
@@ -58,7 +58,7 @@ func (this *Client) getBlock(ctx context.Context, key string, opt *blockOptions)
 		return true, "", err
 	}
 
-	// 如果该 key 没有数据，则尝试对其进行执行写入操作
+	// 如果该 key 没有数据，则尝试对其执行写入操作
 	if err == redis.Nil {
 		// 当从 redis 没有获取到数据的时候，写入 blockValue
 		if this.SetNX(ctx, key, opt.BlockValue, opt.BlockTime).Val() {
