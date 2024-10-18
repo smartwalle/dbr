@@ -93,7 +93,7 @@ func Test_PendingToReadyScript(t *testing.T) {
 	var keys = []string{
 		internal.PendingKey(queue),
 		internal.ReadyKey(queue),
-		internal.MessageKeyPrefix(queue),
+		internal.MessagePrefixKey(queue),
 	}
 	var args = []interface{}{
 		10,

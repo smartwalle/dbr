@@ -50,6 +50,13 @@ type DelayQueue struct {
 	consuming bool
 	close     chan struct{}
 
+	pengingKey       string
+	readyKey         string
+	activeKey        string
+	retryKey         string
+	consumerKey      string
+	messagePrefixKey string
+
 	fetchLimit    int           // 单次最大消费量限制
 	fetchInterval time.Duration // 消费间隔时间
 	retryDelay    int           // 重试延迟时间（秒）
@@ -81,6 +88,14 @@ func NewDelayQueue(client redis.UniversalClient, name string, opts ...Option) (*
 	q.uuid = NewUUID()
 	q.mu = &sync.Mutex{}
 	q.consuming = false
+
+	q.pengingKey = internal.PendingKey(name)
+	q.readyKey = internal.ReadyKey(name)
+	q.activeKey = internal.ActiveKey(name)
+	q.retryKey = internal.RetryKey(name)
+	q.consumerKey = internal.ConsumerKey(name)
+	q.messagePrefixKey = internal.MessagePrefixKey(name)
+
 	q.fetchLimit = 1000
 	q.fetchInterval = time.Second
 	q.retryDelay = 5
@@ -112,7 +127,7 @@ func (q *DelayQueue) Enqueue(ctx context.Context, id string, opts ...MessageOpti
 	}
 
 	var keys = []string{
-		internal.PendingKey(q.name),
+		q.pengingKey,
 		internal.MessageKey(q.name, m.id),
 	}
 	var args = []interface{}{
@@ -136,7 +151,7 @@ func (q *DelayQueue) Remove(ctx context.Context, id string) error {
 	}
 
 	var keys = []string{
-		internal.PendingKey(q.name),
+		q.pengingKey,
 		internal.MessageKey(q.name, id),
 	}
 	var args = []interface{}{
@@ -150,9 +165,9 @@ func (q *DelayQueue) Remove(ctx context.Context, id string) error {
 
 func (q *DelayQueue) pendingToReady(ctx context.Context) error {
 	var keys = []string{
-		internal.PendingKey(q.name),
-		internal.ReadyKey(q.name),
-		internal.MessageKeyPrefix(q.name),
+		q.pengingKey,
+		q.readyKey,
+		q.messagePrefixKey,
 	}
 	var args = []interface{}{
 		q.fetchLimit,
@@ -165,9 +180,9 @@ func (q *DelayQueue) pendingToReady(ctx context.Context) error {
 
 func (q *DelayQueue) readyToActiveScript(ctx context.Context) (string, error) {
 	var keys = []string{
-		internal.ReadyKey(q.name),
-		internal.ActiveKey(q.name),
-		internal.ConsumerKey(q.name),
+		q.readyKey,
+		q.activeKey,
+		q.consumerKey,
 	}
 	var args = []interface{}{
 		q.uuid,
@@ -182,9 +197,9 @@ func (q *DelayQueue) readyToActiveScript(ctx context.Context) (string, error) {
 
 func (q *DelayQueue) activeToRetryScript(ctx context.Context) error {
 	var keys = []string{
-		internal.ActiveKey(q.name),
-		internal.RetryKey(q.name),
-		internal.ConsumerKey(q.name),
+		q.activeKey,
+		q.retryKey,
+		q.consumerKey,
 	}
 	var args = []interface{}{
 		q.retryDelay,
@@ -199,9 +214,9 @@ func (q *DelayQueue) activeToRetryScript(ctx context.Context) error {
 
 func (q *DelayQueue) retryToAciveScript(ctx context.Context) (string, error) {
 	var keys = []string{
-		internal.RetryKey(q.name),
-		internal.ActiveKey(q.name),
-		internal.ConsumerKey(q.name),
+		q.retryKey,
+		q.activeKey,
+		q.consumerKey,
 	}
 	var args = []interface{}{
 		q.uuid,
@@ -216,7 +231,7 @@ func (q *DelayQueue) retryToAciveScript(ctx context.Context) (string, error) {
 
 func (q *DelayQueue) ack(ctx context.Context, uuid string) error {
 	var keys = []string{
-		internal.ActiveKey(q.name),
+		q.activeKey,
 		internal.MessageKey(q.name, uuid),
 	}
 	_, err := internal.AckScript.Run(ctx, q.client, keys).Result()
@@ -228,8 +243,8 @@ func (q *DelayQueue) ack(ctx context.Context, uuid string) error {
 
 func (q *DelayQueue) nack(ctx context.Context, uuid string) error {
 	var keys = []string{
-		internal.ActiveKey(q.name),
-		internal.RetryKey(q.name),
+		q.activeKey,
+		q.retryKey,
 		internal.MessageKey(q.name, uuid),
 	}
 	var args = []interface{}{
@@ -244,7 +259,7 @@ func (q *DelayQueue) nack(ctx context.Context, uuid string) error {
 
 func (q *DelayQueue) clearConsumer(ctx context.Context) error {
 	var keys = []string{
-		internal.ConsumerKey(q.name),
+		q.consumerKey,
 	}
 	_, err := internal.ClearConsumerScript.Run(ctx, q.client, keys).Result()
 	if err != nil && !errors.Is(err, redis.Nil) {
@@ -342,7 +357,7 @@ func (q *DelayQueue) StartConsume(handler Handler) error {
 	q.close = make(chan struct{}, 1)
 
 	// 上报消费者
-	value, err := q.client.ZAddNX(context.Background(), internal.ConsumerKey(q.name), redis.Z{Member: q.uuid, Score: float64(time.Now().UnixMilli() + 30*1000)}).Result()
+	value, err := q.client.ZAddNX(context.Background(), q.consumerKey, redis.Z{Member: q.uuid, Score: float64(time.Now().UnixMilli() + 30*1000)}).Result()
 	if err != nil {
 		return err
 	}
@@ -361,7 +376,7 @@ func (q *DelayQueue) StartConsume(handler Handler) error {
 				select {
 				case <-ticker.C:
 					// 上报消费者存活状态
-					_, rErr := q.client.ZAddXX(context.Background(), internal.ConsumerKey(q.name), redis.Z{Member: q.uuid, Score: float64(time.Now().UnixMilli() + 30*1000)}).Result()
+					_, rErr := q.client.ZAddXX(context.Background(), q.consumerKey, redis.Z{Member: q.uuid, Score: float64(time.Now().UnixMilli() + 30*1000)}).Result()
 					if rErr != nil {
 						q.StopConsume()
 					}
@@ -407,7 +422,7 @@ func (q *DelayQueue) StopConsume() error {
 	if !q.consuming {
 		return nil
 	}
-	q.client.ZRem(context.Background(), internal.ConsumerKey(q.name), q.uuid)
+	q.client.ZRem(context.Background(), q.consumerKey, q.uuid)
 	q.consuming = false
 	close(q.close)
 	return nil

@@ -31,12 +31,13 @@ func ConsumerKey(qname string) string {
 	return fmt.Sprintf("%s:consumer", QueueKey(qname))
 }
 
-// MessageKeyPrefix 用于构建[消息]前缀名字
-func MessageKeyPrefix(qname string) string {
+// MessagePrefixKey 用于构建[消息]前缀名字
+func MessagePrefixKey(qname string) string {
 	return fmt.Sprintf("%s:m:", QueueKey(qname))
 }
 
 // MessageKey 用于构建[消息]的名字
 func MessageKey(qname, id string) string {
-	return fmt.Sprintf("%s%s", MessageKeyPrefix(qname), id)
+	return fmt.Sprintf("%s:m:%s", QueueKey(qname), id)
+	//return fmt.Sprintf("%s%s", MessagePrefixKey(qname), id)
 }
