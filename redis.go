@@ -28,7 +28,7 @@ func New(addr, password string, db, poolSize, minIdleConns int) (UniversalClient
 func NewWithOption(opts *redis.Options) (UniversalClient, error) {
 	var rClient = redis.NewClient(opts)
 
-	if _, err := rClient.Ping(context.TODO()).Result(); err != nil {
+	if _, err := rClient.Ping(context.Background()).Result(); err != nil {
 		return nil, err
 	}
 
