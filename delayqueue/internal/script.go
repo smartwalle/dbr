@@ -45,11 +45,11 @@ var readyToRunningScript string
 // ReadyToRunningScript 将消息从[就绪队列]转移到[处理中队列]
 var ReadyToRunningScript = redis.NewScript(readyToRunningScript)
 
-//go:embed running_to_retry.lua
-var runningToRetryScript string
+//go:embed running_to_pending.lua
+var runningToPendingScript string
 
-// RunningToRetryScript 将[处理中队列]中已经消费超时的消息转移到[待重试队列]
-var RunningToRetryScript = redis.NewScript(runningToRetryScript)
+// RunningToPendingScript 将[处理中队列]中已经消费超时的消息转移到[待重试队列]
+var RunningToPendingScript = redis.NewScript(runningToPendingScript)
 
 //go:embed ack.lua
 var ackScript string
@@ -62,12 +62,6 @@ var nackScript string
 
 // NackScript 消费失败
 var NackScript = redis.NewScript(nackScript)
-
-//go:embed retry_to_running.lua
-var retryToRunningScript string
-
-// RetryToRunningScript 将消息从[待重试队列]转移到[处理中队列]
-var RetryToRunningScript = redis.NewScript(retryToRunningScript)
 
 //go:embed clear_consumer.lua
 var clearConsumerScript string

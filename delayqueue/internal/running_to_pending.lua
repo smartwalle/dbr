@@ -1,5 +1,5 @@
 -- KEYS[1] - 处理中队列
--- KEYS[2] - 待重试队列
+-- KEYS[2] - 待消费队列
 -- KEYS[3] - 消费者队列
 
 local toRetry = function(mKey, now)
@@ -41,8 +41,12 @@ local toRetry = function(mKey, now)
             retryTime = retryTime + tonumber(retryDelay) * 1000
         end
 
-        -- 添加到[待重试队列]中
-        redis.call('ZADD', KEYS[2], retryTime, mKey)
+        -- 获取消息uuid
+        local uuid = redis.call('HGET', mKey, 'uuid')
+        if uuid ~= nil and uuid ~= '' then
+            -- 添加到[待消费队列]中
+            redis.call('ZADD', KEYS[2], retryTime, uuid)
+        end
     else
         -- 删除[消息结构]
         redis.call('DEL', mKey)

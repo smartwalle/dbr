@@ -21,11 +21,6 @@ func RunningKey(qname string) string {
 	return fmt.Sprintf("%s:running", QueueKey(qname))
 }
 
-// RetryKey 用于构建[待重试队列]名字
-func RetryKey(qname string) string {
-	return fmt.Sprintf("%s:retry", QueueKey(qname))
-}
-
 // ConsumerKey 用于构建[消费者队列]名字
 func ConsumerKey(qname string) string {
 	return fmt.Sprintf("%s:consumer", QueueKey(qname))

@@ -36,7 +36,6 @@ func Test_QueueKey(t *testing.T) {
 	t.Log(internal.PendingKey(queue))
 	t.Log(internal.ReadyKey(queue))
 	t.Log(internal.RunningKey(queue))
-	t.Log(internal.RetryKey(queue))
 	t.Log(internal.MessageKey(queue, "11"))
 	t.Log(internal.MessageKey(queue, "22"))
 }
@@ -123,16 +122,16 @@ func Test_ReadyToRunningScript(t *testing.T) {
 	t.Log(raw)
 }
 
-func Test_RunningToRetryScript(t *testing.T) {
+func Test_RunningToPendingScript(t *testing.T) {
 	reportConsumer(t)
 
 	var keys = []string{
 		internal.RunningKey(queue),
-		internal.RetryKey(queue),
+		internal.PendingKey(queue),
 		internal.ConsumerKey(queue),
 	}
 	var args []interface{}
-	raw, err := internal.RunningToRetryScript.Run(context.Background(), redisClient, keys, args).Result()
+	raw, err := internal.RunningToPendingScript.Run(context.Background(), redisClient, keys, args).Result()
 	if err != nil && !errors.Is(err, redis.Nil) {
 		t.Fatal(err)
 	}
@@ -154,27 +153,11 @@ func Test_AckScript(t *testing.T) {
 func Test_NackScript(t *testing.T) {
 	var keys = []string{
 		internal.RunningKey(queue),
-		internal.RetryKey(queue),
+		internal.PendingKey(queue),
 		internal.MessageKey(queue, "8adaf494-1c70-4017-93bc-5786a26ea6b0"),
 	}
 	var args []interface{}
 	raw, err := internal.NackScript.Run(context.Background(), redisClient, keys, args).Result()
-	if err != nil && !errors.Is(err, redis.Nil) {
-		t.Fatal(err)
-	}
-	t.Log(raw)
-}
-
-func Test_RetryToAciveScript(t *testing.T) {
-	var keys = []string{
-		internal.RetryKey(queue),
-		internal.RunningKey(queue),
-		internal.ConsumerKey(queue),
-	}
-	var args = []interface{}{
-		consumer,
-	}
-	raw, err := internal.RetryToRunningScript.Run(context.Background(), redisClient, keys, args).Result()
 	if err != nil && !errors.Is(err, redis.Nil) {
 		t.Fatal(err)
 	}

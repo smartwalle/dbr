@@ -18,7 +18,10 @@ if (#ids > 0) then
             if (uuid ~= nil and uuid ~= '') then
                 local nKey = KEYS[3]..uuid
                 redis.call('RPUSH', KEYS[2], nKey)
-                redis.call('RENAME', mKey, nKey)
+                if uuid ~= id then
+                    -- 消费超时的消息和 nack 的消息被重新添加到[待消费队列]中时，用的是 uuid
+                    redis.call('RENAME', mKey, nKey)
+                end
             end
         end
         redis.call('ZREM', KEYS[1], id)

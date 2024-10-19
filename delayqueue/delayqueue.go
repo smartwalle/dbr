@@ -44,7 +44,6 @@ type DelayQueue struct {
 	pengingKey       string
 	readyKey         string
 	runningKey       string
-	retryKey         string
 	consumerKey      string
 	messagePrefixKey string
 
@@ -82,7 +81,6 @@ func New(client redis.UniversalClient, name string, opts ...Option) (*DelayQueue
 	q.pengingKey = internal.PendingKey(name)
 	q.readyKey = internal.ReadyKey(name)
 	q.runningKey = internal.RunningKey(name)
-	q.retryKey = internal.RetryKey(name)
 	q.consumerKey = internal.ConsumerKey(name)
 	q.messagePrefixKey = internal.MessagePrefixKey(name)
 
@@ -186,35 +184,18 @@ func (q *DelayQueue) readyToRunningScript(ctx context.Context) (string, error) {
 	return uuid, nil
 }
 
-func (q *DelayQueue) runningToRetryScript(ctx context.Context) error {
+func (q *DelayQueue) runningToPendingScript(ctx context.Context) error {
 	var keys = []string{
 		q.runningKey,
-		q.retryKey,
+		q.pengingKey,
 		q.consumerKey,
 	}
 
-	_, err := internal.RunningToRetryScript.Run(ctx, q.client, keys).Result()
+	_, err := internal.RunningToPendingScript.Run(ctx, q.client, keys).Result()
 	if err != nil && !errors.Is(err, redis.Nil) {
 		return err
 	}
 	return nil
-}
-
-func (q *DelayQueue) retryToRunningScript(ctx context.Context) (string, error) {
-	var keys = []string{
-		q.retryKey,
-		q.runningKey,
-		q.consumerKey,
-	}
-	var args = []interface{}{
-		q.uuid,
-	}
-	raw, err := internal.RetryToRunningScript.Run(ctx, q.client, keys, args).Result()
-	if err != nil && !errors.Is(err, redis.Nil) {
-		return "", err
-	}
-	uuid, _ := raw.(string)
-	return uuid, nil
 }
 
 func (q *DelayQueue) ack(ctx context.Context, uuid string) error {
@@ -232,7 +213,7 @@ func (q *DelayQueue) ack(ctx context.Context, uuid string) error {
 func (q *DelayQueue) nack(ctx context.Context, uuid string) error {
 	var keys = []string{
 		q.runningKey,
-		q.retryKey,
+		q.pengingKey,
 		internal.MessageKey(q.name, uuid),
 	}
 
@@ -312,23 +293,10 @@ func (q *DelayQueue) consume(ctx context.Context, handler Handler) (err error) {
 	}
 
 	// 处理消费超时的消息
-	if err = q.runningToRetryScript(ctx); err != nil {
+	if err = q.runningToPendingScript(ctx); err != nil {
 		return err
 	}
 
-	// 消费重试消息
-	for {
-		uuid, err = q.retryToRunningScript(ctx)
-		if err != nil {
-			return err
-		}
-		if uuid == "" {
-			break
-		}
-		if err = q.consumeMessage(ctx, uuid, handler); err != nil {
-			return err
-		}
-	}
 	return nil
 }
 
@@ -385,7 +353,7 @@ func (q *DelayQueue) StartConsume(handler Handler) error {
 				case <-ticker.C:
 					rErr := q.consume(context.Background(), handler)
 					if rErr != nil {
-						// TODO error
+						q.StopConsume()
 					}
 				case <-q.close:
 					break runLoop

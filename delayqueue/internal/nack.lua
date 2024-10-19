@@ -1,5 +1,5 @@
 -- KEYS[1] - 处理中队列
--- KEYS[2] - 待重试队列
+-- KEYS[2] - 待消费队列
 -- KEYS[3] - MessageKey(uuid)
 
 local mKey = KEYS[3]
@@ -42,8 +42,8 @@ if retryRemainCount ~= nil and retryRemainCount ~= '' and tonumber(retryRemainCo
         retryTime = retryTime + tonumber(retryDelay) * 1000
     end
 
-    -- 添加到[待重试队列]中
-    redis.call('ZADD', KEYS[2], retryTime, mKey)
+    -- 添加到[待消费队列]中
+    redis.call('ZADD', KEYS[2], retryTime, uuid)
 else
     -- 删除[消息结构]
     redis.call('DEL', mKey)
