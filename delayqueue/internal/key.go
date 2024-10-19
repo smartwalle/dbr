@@ -3,7 +3,7 @@ package internal
 import "fmt"
 
 func QueueKey(qname string) string {
-	return fmt.Sprintf("dbr:delayqueue:{%s}", qname)
+	return fmt.Sprintf("dbr:dq:{%s}", qname)
 }
 
 // PendingKey 用于构建[待消费队列]名字
