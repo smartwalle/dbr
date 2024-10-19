@@ -16,9 +16,9 @@ func ReadyKey(qname string) string {
 	return fmt.Sprintf("%s:ready", QueueKey(qname))
 }
 
-// ActiveKey 用于构建[处理中队列]名字
-func ActiveKey(qname string) string {
-	return fmt.Sprintf("%s:active", QueueKey(qname))
+// RunningKey 用于构建[处理中队列]名字
+func RunningKey(qname string) string {
+	return fmt.Sprintf("%s:running", QueueKey(qname))
 }
 
 // RetryKey 用于构建[待重试队列]名字

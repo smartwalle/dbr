@@ -3,7 +3,7 @@
 -- KEYS[3] - 消费者队列
 -- ARGV[1] - 消费者id
 
-local toActive= function(mKey)
+local toRunning= function(mKey)
     -- 判断消息结构是否存在
     local found = redis.call('EXISTS', mKey)
     if (found == 0) then
@@ -35,7 +35,7 @@ local mKeys = redis.call('ZRANGEBYSCORE', KEYS[1], '-inf', milliseconds, 'LIMIT'
 if (#mKeys > 0) then
     for _, mKey in ipairs(mKeys) do
         if (mKey ~= nil and mKey ~= '') then
-            return toActive(mKey, milliseconds)
+            return toRunning(mKey, milliseconds)
         end
     end
 end

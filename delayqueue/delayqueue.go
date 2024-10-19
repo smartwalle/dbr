@@ -52,7 +52,7 @@ type DelayQueue struct {
 
 	pengingKey       string
 	readyKey         string
-	activeKey        string
+	runningKey       string
 	retryKey         string
 	consumerKey      string
 	messagePrefixKey string
@@ -91,7 +91,7 @@ func New(client redis.UniversalClient, name string, opts ...Option) (*DelayQueue
 
 	q.pengingKey = internal.PendingKey(name)
 	q.readyKey = internal.ReadyKey(name)
-	q.activeKey = internal.ActiveKey(name)
+	q.runningKey = internal.RunningKey(name)
 	q.retryKey = internal.RetryKey(name)
 	q.consumerKey = internal.ConsumerKey(name)
 	q.messagePrefixKey = internal.MessagePrefixKey(name)
@@ -178,16 +178,16 @@ func (q *DelayQueue) pendingToReady(ctx context.Context) error {
 	return nil
 }
 
-func (q *DelayQueue) readyToActiveScript(ctx context.Context) (string, error) {
+func (q *DelayQueue) readyToRunningScript(ctx context.Context) (string, error) {
 	var keys = []string{
 		q.readyKey,
-		q.activeKey,
+		q.runningKey,
 		q.consumerKey,
 	}
 	var args = []interface{}{
 		q.uuid,
 	}
-	raw, err := internal.ReadyToActiveScript.Run(ctx, q.client, keys, args).Result()
+	raw, err := internal.ReadyToRunningScript.Run(ctx, q.client, keys, args).Result()
 	if err != nil && !errors.Is(err, redis.Nil) {
 		return "", err
 	}
@@ -195,9 +195,9 @@ func (q *DelayQueue) readyToActiveScript(ctx context.Context) (string, error) {
 	return uuid, nil
 }
 
-func (q *DelayQueue) activeToRetryScript(ctx context.Context) error {
+func (q *DelayQueue) runningToRetryScript(ctx context.Context) error {
 	var keys = []string{
-		q.activeKey,
+		q.runningKey,
 		q.retryKey,
 		q.consumerKey,
 	}
@@ -205,7 +205,7 @@ func (q *DelayQueue) activeToRetryScript(ctx context.Context) error {
 		q.retryDelay,
 	}
 
-	_, err := internal.ActiveToRetryScript.Run(ctx, q.client, keys, args).Result()
+	_, err := internal.RunningToRetryScript.Run(ctx, q.client, keys, args).Result()
 	if err != nil && !errors.Is(err, redis.Nil) {
 		return err
 	}
@@ -215,13 +215,13 @@ func (q *DelayQueue) activeToRetryScript(ctx context.Context) error {
 func (q *DelayQueue) retryToAciveScript(ctx context.Context) (string, error) {
 	var keys = []string{
 		q.retryKey,
-		q.activeKey,
+		q.runningKey,
 		q.consumerKey,
 	}
 	var args = []interface{}{
 		q.uuid,
 	}
-	raw, err := internal.RetryToAciveScript.Run(ctx, q.client, keys, args).Result()
+	raw, err := internal.RetryToRunningScript.Run(ctx, q.client, keys, args).Result()
 	if err != nil && !errors.Is(err, redis.Nil) {
 		return "", err
 	}
@@ -231,7 +231,7 @@ func (q *DelayQueue) retryToAciveScript(ctx context.Context) (string, error) {
 
 func (q *DelayQueue) ack(ctx context.Context, uuid string) error {
 	var keys = []string{
-		q.activeKey,
+		q.runningKey,
 		internal.MessageKey(q.name, uuid),
 	}
 	_, err := internal.AckScript.Run(ctx, q.client, keys).Result()
@@ -243,7 +243,7 @@ func (q *DelayQueue) ack(ctx context.Context, uuid string) error {
 
 func (q *DelayQueue) nack(ctx context.Context, uuid string) error {
 	var keys = []string{
-		q.activeKey,
+		q.runningKey,
 		q.retryKey,
 		internal.MessageKey(q.name, uuid),
 	}
@@ -309,7 +309,7 @@ func (q *DelayQueue) consume(ctx context.Context, handler Handler) (err error) {
 
 	// 消费消息
 	for {
-		uuid, err = q.readyToActiveScript(ctx)
+		uuid, err = q.readyToRunningScript(ctx)
 		if err != nil {
 			return err
 		}
@@ -327,7 +327,7 @@ func (q *DelayQueue) consume(ctx context.Context, handler Handler) (err error) {
 	}
 
 	// 处理消费超时的消息
-	if err = q.activeToRetryScript(ctx); err != nil {
+	if err = q.runningToRetryScript(ctx); err != nil {
 		return err
 	}
 
