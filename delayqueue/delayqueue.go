@@ -200,7 +200,7 @@ func (q *DelayQueue) runningToRetryScript(ctx context.Context) error {
 	return nil
 }
 
-func (q *DelayQueue) retryToAciveScript(ctx context.Context) (string, error) {
+func (q *DelayQueue) retryToRunningScript(ctx context.Context) (string, error) {
 	var keys = []string{
 		q.retryKey,
 		q.runningKey,
@@ -318,7 +318,7 @@ func (q *DelayQueue) consume(ctx context.Context, handler Handler) (err error) {
 
 	// 消费重试消息
 	for {
-		uuid, err = q.retryToAciveScript(ctx)
+		uuid, err = q.retryToRunningScript(ctx)
 		if err != nil {
 			return err
 		}
