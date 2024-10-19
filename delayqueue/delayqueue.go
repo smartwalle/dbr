@@ -260,7 +260,6 @@ func (q *DelayQueue) consumeMessage(ctx context.Context, uuid string, handler Ha
 		if r != nil {
 			q.nack(ctx, uuid)
 		}
-		// TODO 待完善
 	}()
 	if uuid == "" {
 		return nil
