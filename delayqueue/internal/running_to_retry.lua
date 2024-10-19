@@ -1,7 +1,6 @@
 -- KEYS[1] - 处理中队列
 -- KEYS[2] - 待重试队列
 -- KEYS[3] - 消费者队列
--- ARGV[1] - 重试延迟时间（秒）
 
 local toRetry = function(mKey, now)
     -- 判断消息结构是否存在
@@ -26,20 +25,27 @@ local toRetry = function(mKey, now)
     end
 
     -- 获取剩余重试次数
-    local count = redis.call('HGET', mKey, 'rc')
-    if (count ~= nil and count ~= '' and tonumber(count) > 0) then
+    local retryRemainCount = redis.call('HGET', mKey, 'rr')
+    if (retryRemainCount ~= nil and retryRemainCount ~= '' and tonumber(retryRemainCount) > 0) then
         -- 剩余重试次数大于 0
         -- 更新剩余重试次数
-        redis.call('HINCRBY', mKey, 'rc', -1)
+        redis.call('HINCRBY', mKey, 'rr', -1)
         -- 清除消费者id
         redis.call('HSET', mKey, 'cid', '')
+
+        local retryTime = now
+
+        -- 获取重试延迟时间
+        local retryDelay = redis.call('HGET', mKey, 'rd')
+        if retryDelay ~= nil and retryDelay ~= '' and tonumber(retryDelay) > 0 then
+            retryTime = retryTime + tonumber(retryDelay) * 1000
+        end
+
         -- 添加到[待重试队列]中
-        local timeout = now+ARGV[1] * 1000
-        redis.call('ZADD', KEYS[2], timeout, mKey)
+        redis.call('ZADD', KEYS[2], retryTime, mKey)
     else
         -- 删除[消息结构]
         redis.call('DEL', mKey)
-        -- TODO 记录失败消息
     end
     -- 从[处理中队列]中删除消息
     redis.call('ZREM', KEYS[1], mKey)

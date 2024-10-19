@@ -33,15 +33,6 @@ func WithFetchInterval(d time.Duration) Option {
 	}
 }
 
-func WithRetryDelay(seconds int) Option {
-	return func(q *DelayQueue) {
-		if seconds <= 0 {
-			q.retryDelay = 5
-		}
-		q.retryDelay = seconds
-	}
-}
-
 type DelayQueue struct {
 	client    redis.UniversalClient
 	name      string
@@ -59,7 +50,6 @@ type DelayQueue struct {
 
 	fetchLimit    int           // 单次最大消费量限制
 	fetchInterval time.Duration // 消费间隔时间
-	retryDelay    int           // 重试延迟时间（秒）
 }
 
 var (
@@ -98,7 +88,6 @@ func New(client redis.UniversalClient, name string, opts ...Option) (*DelayQueue
 
 	q.fetchLimit = 1000
 	q.fetchInterval = time.Second
-	q.retryDelay = 5
 	for _, opt := range opts {
 		if opt != nil {
 			opt(q)
@@ -120,6 +109,7 @@ func (q *DelayQueue) Enqueue(ctx context.Context, id string, opts ...MessageOpti
 	m.id = id
 	m.uuid = NewUUID()
 	m.queue = q.name
+	m.retryDelay = 5 // 默认 5 秒后重试
 	for _, opt := range opts {
 		if opt != nil {
 			opt(m)
@@ -136,7 +126,8 @@ func (q *DelayQueue) Enqueue(ctx context.Context, id string, opts ...MessageOpti
 		m.deliverAt,
 		m.queue,
 		m.body,
-		m.retry,
+		m.retryRemain,
+		m.retryDelay,
 	}
 	if _, err := internal.ScheduleScript.Run(ctx, q.client, keys, args).Result(); err != nil && !errors.Is(err, redis.Nil) {
 		return err
@@ -201,11 +192,8 @@ func (q *DelayQueue) runningToRetryScript(ctx context.Context) error {
 		q.retryKey,
 		q.consumerKey,
 	}
-	var args = []interface{}{
-		q.retryDelay,
-	}
 
-	_, err := internal.RunningToRetryScript.Run(ctx, q.client, keys, args).Result()
+	_, err := internal.RunningToRetryScript.Run(ctx, q.client, keys).Result()
 	if err != nil && !errors.Is(err, redis.Nil) {
 		return err
 	}
@@ -247,10 +235,8 @@ func (q *DelayQueue) nack(ctx context.Context, uuid string) error {
 		q.retryKey,
 		internal.MessageKey(q.name, uuid),
 	}
-	var args = []interface{}{
-		q.retryDelay,
-	}
-	_, err := internal.NackScript.Run(ctx, q.client, keys, args).Result()
+
+	_, err := internal.NackScript.Run(ctx, q.client, keys).Result()
 	if err != nil && !errors.Is(err, redis.Nil) {
 		return err
 	}

@@ -131,9 +131,7 @@ func Test_RunningToRetryScript(t *testing.T) {
 		internal.RetryKey(queue),
 		internal.ConsumerKey(queue),
 	}
-	var args = []interface{}{
-		5,
-	}
+	var args []interface{}
 	raw, err := internal.RunningToRetryScript.Run(context.Background(), redisClient, keys, args).Result()
 	if err != nil && !errors.Is(err, redis.Nil) {
 		t.Fatal(err)
@@ -159,9 +157,7 @@ func Test_NackScript(t *testing.T) {
 		internal.RetryKey(queue),
 		internal.MessageKey(queue, "8adaf494-1c70-4017-93bc-5786a26ea6b0"),
 	}
-	var args = []interface{}{
-		5,
-	}
+	var args []interface{}
 	raw, err := internal.NackScript.Run(context.Background(), redisClient, keys, args).Result()
 	if err != nil && !errors.Is(err, redis.Nil) {
 		t.Fatal(err)

@@ -11,12 +11,13 @@ func NewUUID() string {
 
 // Message 消息结构 (hash)
 type Message struct {
-	id        string // 消息 id - id
-	uuid      string // 消息 uuid - uuid
-	queue     string // 队列名称 - qn
-	body      string // 消息内容 - bd
-	retry     int    // 剩余重试次数 - rc
-	deliverAt int64  // 消费时间（投递时间）- dt
+	id          string // 消息 id - id
+	uuid        string // 消息 uuid - uuid
+	queue       string // 队列名称 - qn
+	body        string // 消息内容 - bd
+	retryRemain int    // 剩余重试次数 - rr
+	retryDelay  int    // 重试延迟时间（秒）- rd
+	deliverAt   int64  // 消费时间（投递时间）- dt
 }
 
 func (m *Message) ID() string {
@@ -65,6 +66,15 @@ func WithBody(body string) MessageOption {
 
 func WithMaxRetry(maxRetry int) MessageOption {
 	return func(m *Message) {
-		m.retry = maxRetry
+		m.retryRemain = maxRetry
+	}
+}
+
+func WithRetryDelay(seconds int) MessageOption {
+	return func(m *Message) {
+		if seconds <= 0 {
+			m.retryDelay = 5
+		}
+		m.retryDelay = seconds
 	}
 }

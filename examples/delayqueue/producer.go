@@ -22,6 +22,6 @@ func main() {
 	}
 
 	for i := 0; i < 10; i++ {
-		fmt.Println(i, queue.Enqueue(context.Background(), fmt.Sprintf("%d", i), delayqueue.WithDeliverAfter(0), delayqueue.WithMaxRetry(1), delayqueue.WithBody(fmt.Sprintf("body-%d", i))))
+		fmt.Println(i, queue.Enqueue(context.Background(), fmt.Sprintf("%d", i), delayqueue.WithDeliverAfter(0), delayqueue.WithMaxRetry(3), delayqueue.WithRetryDelay(1), delayqueue.WithBody(fmt.Sprintf("body-%d", i))))
 	}
 }
