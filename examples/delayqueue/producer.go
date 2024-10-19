@@ -15,7 +15,7 @@ func main() {
 
 	var rClient = redis.NewClient(opt)
 
-	var queue, err = delayqueue.NewDelayQueue(rClient, "mail")
+	var queue, err = delayqueue.New(rClient, "mail")
 	if err != nil {
 		fmt.Println("NewDelayQueue Error", err)
 		return

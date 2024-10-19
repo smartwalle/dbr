@@ -69,7 +69,7 @@ var (
 	ErrConsumerExists     = errors.New("consumer exists")
 )
 
-func NewDelayQueue(client redis.UniversalClient, name string, opts ...Option) (*DelayQueue, error) {
+func New(client redis.UniversalClient, name string, opts ...Option) (*DelayQueue, error) {
 	if client == nil {
 		return nil, ErrInvalidRedisClient
 	}
