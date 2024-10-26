@@ -300,7 +300,7 @@ func (q *DelayQueue) consume(ctx context.Context, handler Handler) (err error) {
 	return nil
 }
 
-func (q *DelayQueue) StartConsume(handler Handler) error {
+func (q *DelayQueue) StartConsume(ctx context.Context, handler Handler) error {
 	q.mu.Lock()
 	defer q.mu.Unlock()
 	if q.consuming {
@@ -310,7 +310,7 @@ func (q *DelayQueue) StartConsume(handler Handler) error {
 	q.close = make(chan struct{}, 1)
 
 	// 上报消费者
-	value, err := q.client.ZAddNX(context.Background(), q.consumerKey, redis.Z{Member: q.uuid, Score: float64(time.Now().UnixMilli() + 30*1000)}).Result()
+	value, err := q.client.ZAddNX(ctx, q.consumerKey, redis.Z{Member: q.uuid, Score: float64(time.Now().UnixMilli() + 60*1000)}).Result()
 	if err != nil {
 		return err
 	}
@@ -329,7 +329,7 @@ func (q *DelayQueue) StartConsume(handler Handler) error {
 				select {
 				case <-ticker.C:
 					// 上报消费者存活状态
-					_, rErr := q.client.ZAddXX(context.Background(), q.consumerKey, redis.Z{Member: q.uuid, Score: float64(time.Now().UnixMilli() + 30*1000)}).Result()
+					_, rErr := q.client.ZAddXX(ctx, q.consumerKey, redis.Z{Member: q.uuid, Score: float64(time.Now().UnixMilli() + 60*1000)}).Result()
 					if rErr != nil {
 						q.StopConsume()
 					}
@@ -351,9 +351,9 @@ func (q *DelayQueue) StartConsume(handler Handler) error {
 			default:
 				select {
 				case <-ticker.C:
-					rErr := q.consume(context.Background(), handler)
+					rErr := q.consume(ctx, handler)
 					if rErr != nil {
-						q.StopConsume()
+						// 记录日志
 					}
 				case <-q.close:
 					break runLoop
