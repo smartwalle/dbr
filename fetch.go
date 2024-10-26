@@ -57,7 +57,7 @@ func WithMaxRetries(retries int) FetchOption {
 func WithRetryTimeout(timeout time.Duration) FetchOption {
 	return func(opts *fetchOptions) {
 		if timeout <= 0 {
-			timeout = time.Second
+			timeout = time.Second * 2
 		}
 		opts.RetryTimeout = timeout
 	}
