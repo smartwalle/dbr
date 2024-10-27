@@ -34,7 +34,7 @@ func TestFetch2(t *testing.T) {
 		go func() {
 			value, err := dbr.Fetch(context.Background(), rClient, "fetch:2", func(ctx context.Context) (string, time.Duration, error) {
 				t.Log("开始加载数据")
-				time.Sleep(time.Millisecond * 800)
+				time.Sleep(time.Millisecond * 100)
 				t.Log("数据加载完成")
 				return "还是你好！", time.Second * 5, nil
 			})
