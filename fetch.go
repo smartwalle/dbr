@@ -105,7 +105,10 @@ func fetch(ctx context.Context, client redis.UniversalClient, key string, fn fun
 	var runTimes = 0
 	var locked = false
 	for runTimes <= opts.MaxRetries {
-		if locked, _ = client.SetNX(ctx, lockKey, fmt.Sprintf("%d-%d", os.Getpid(), time.Now().UnixMilli()), opts.LoadDataTimeout).Result(); locked {
+		if locked, err = client.SetNX(ctx, lockKey, fmt.Sprintf("%d-%d", os.Getpid(), time.Now().UnixMilli()), opts.LoadDataTimeout).Result(); err != nil {
+			return value, err
+		}
+		if locked {
 			break
 		}
 		if runTimes < opts.MaxRetries {
