@@ -29,19 +29,19 @@ func TestFetch2(t *testing.T) {
 	var rClient, _ = dbr.New("127.0.0.1:6379", "", 1, 2, 2)
 
 	var wg sync.WaitGroup
-	for i := 0; i < 2; i++ {
+	for i := 0; i < 1000; i++ {
 		wg.Add(1)
 		go func() {
 			value, err := dbr.Fetch(context.Background(), rClient, "fetch:2", func(ctx context.Context) (string, time.Duration, error) {
 				t.Log("开始加载数据")
-				time.Sleep(time.Millisecond * 120)
+				time.Sleep(time.Millisecond * 800)
 				t.Log("数据加载完成")
 				return "还是你好！", time.Second * 5, nil
 			})
 			if err != nil {
 				t.Log(err)
 			}
-			if value != "还是你好" {
+			if value != "还是你好！" {
 				t.Log(value)
 			}
 			wg.Done()
