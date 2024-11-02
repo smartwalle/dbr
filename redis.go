@@ -8,7 +8,7 @@ import (
 type UniversalClient interface {
 	redis.UniversalClient
 
-	Fetch(ctx context.Context, key string, fn func(context.Context) (string, error), opts ...FetchOption) (value string, err error)
+	Fetch(ctx context.Context, key string, fn func(context.Context) ([]byte, error), opts ...FetchOption) (value []byte, err error)
 }
 
 type Client struct {

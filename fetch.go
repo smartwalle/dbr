@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-func (c *Client) Fetch(ctx context.Context, key string, fn func(context.Context) (string, error), opts ...FetchOption) (value string, err error) {
+func (c *Client) Fetch(ctx context.Context, key string, fn func(context.Context) ([]byte, error), opts ...FetchOption) (value []byte, err error) {
 	return Fetch(ctx, c, key, fn, opts...)
 }
 
@@ -72,7 +72,7 @@ func WithLoadDataTimeout(timeout time.Duration) FetchOption {
 	}
 }
 
-func Fetch(ctx context.Context, client redis.UniversalClient, key string, fn func(context.Context) (string, error), opts ...FetchOption) (value string, err error) {
+func Fetch(ctx context.Context, client redis.UniversalClient, key string, fn func(context.Context) ([]byte, error), opts ...FetchOption) (value []byte, err error) {
 	var nOpts = &fetchOptions{}
 	nOpts.Placeholder = "-"
 	nOpts.PlaceholderExpiration = time.Minute * 5
@@ -90,10 +90,10 @@ func Fetch(ctx context.Context, client redis.UniversalClient, key string, fn fun
 	return fetch(ctx, client, key, fn, nOpts)
 }
 
-func fetch(ctx context.Context, client redis.UniversalClient, key string, fn func(context.Context) (string, error), opts *fetchOptions) (value string, err error) {
+func fetch(ctx context.Context, client redis.UniversalClient, key string, fn func(context.Context) ([]byte, error), opts *fetchOptions) (value []byte, err error) {
 	// 从 redis 加载数据
 	// 如果返回了非 redis.Nil 错误，则直接返回
-	if value, err = client.Get(ctx, key).Result(); err != nil && !errors.Is(err, redis.Nil) {
+	if value, err = client.Get(ctx, key).Bytes(); err != nil && !errors.Is(err, redis.Nil) {
 		return value, err
 	}
 	// 如果 err 为 nil，表示 key 在 redis 中已经存在
@@ -130,7 +130,7 @@ func fetch(ctx context.Context, client redis.UniversalClient, key string, fn fun
 
 	// 再次从 redis 加载数据
 	// 如果返回了非 redis.Nil 错误，则直接返回
-	if value, err = client.Get(ctx, key).Result(); err != nil && !errors.Is(err, redis.Nil) {
+	if value, err = client.Get(ctx, key).Bytes(); err != nil && !errors.Is(err, redis.Nil) {
 		return value, err
 	}
 	// 如果 err 为 nil，表示 key 在 redis 中已经存在
