@@ -16,7 +16,7 @@ func (c *Client) Fetch(ctx context.Context, key string, fn func(context.Context)
 type fetchOptions struct {
 	Expiration time.Duration
 
-	Placeholder           string
+	Placeholder           []byte
 	PlaceholderExpiration time.Duration
 
 	MaxRetries int
@@ -33,7 +33,7 @@ func WithExpiration(expiration time.Duration) FetchOption {
 	}
 }
 
-func WithPlaceholder(placeholder string) FetchOption {
+func WithPlaceholder(placeholder []byte) FetchOption {
 	return func(opts *fetchOptions) {
 		opts.Placeholder = placeholder
 	}
@@ -74,7 +74,7 @@ func WithLoadDataTimeout(timeout time.Duration) FetchOption {
 
 func Fetch(ctx context.Context, client redis.UniversalClient, key string, fn func(context.Context) ([]byte, error), opts ...FetchOption) (value []byte, err error) {
 	var nOpts = &fetchOptions{}
-	nOpts.Placeholder = "-"
+	nOpts.Placeholder = []byte("-")
 	nOpts.PlaceholderExpiration = time.Minute * 5
 	nOpts.MaxRetries = 3
 	nOpts.RetryDelay = time.Millisecond * 50
