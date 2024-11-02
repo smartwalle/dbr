@@ -9,11 +9,13 @@ import (
 	"time"
 )
 
-func (c *Client) Fetch(ctx context.Context, key string, fn func(context.Context) (string, time.Duration, error), opts ...FetchOption) (value string, err error) {
+func (c *Client) Fetch(ctx context.Context, key string, fn func(context.Context) (string, error), opts ...FetchOption) (value string, err error) {
 	return Fetch(ctx, c, key, fn, opts...)
 }
 
 type fetchOptions struct {
+	Expiration time.Duration
+
 	Placeholder           string
 	PlaceholderExpiration time.Duration
 
@@ -24,6 +26,12 @@ type fetchOptions struct {
 }
 
 type FetchOption func(opts *fetchOptions)
+
+func WithExpiration(expiration time.Duration) FetchOption {
+	return func(opts *fetchOptions) {
+		opts.Expiration = expiration
+	}
+}
 
 func WithPlaceholder(placeholder string) FetchOption {
 	return func(opts *fetchOptions) {
@@ -64,7 +72,7 @@ func WithLoadDataTimeout(timeout time.Duration) FetchOption {
 	}
 }
 
-func Fetch(ctx context.Context, client redis.UniversalClient, key string, fn func(context.Context) (string, time.Duration, error), opts ...FetchOption) (value string, err error) {
+func Fetch(ctx context.Context, client redis.UniversalClient, key string, fn func(context.Context) (string, error), opts ...FetchOption) (value string, err error) {
 	var nOpts = &fetchOptions{}
 	nOpts.Placeholder = "-"
 	nOpts.PlaceholderExpiration = time.Minute * 5
@@ -82,7 +90,7 @@ func Fetch(ctx context.Context, client redis.UniversalClient, key string, fn fun
 	return fetch(ctx, client, key, fn, nOpts)
 }
 
-func fetch(ctx context.Context, client redis.UniversalClient, key string, fn func(context.Context) (string, time.Duration, error), opts *fetchOptions) (value string, err error) {
+func fetch(ctx context.Context, client redis.UniversalClient, key string, fn func(context.Context) (string, error), opts *fetchOptions) (value string, err error) {
 	// 从 redis 加载数据
 	// 如果返回了非 redis.Nil 错误，则直接返回
 	if value, err = client.Get(ctx, key).Result(); err != nil && !errors.Is(err, redis.Nil) {
@@ -90,10 +98,6 @@ func fetch(ctx context.Context, client redis.UniversalClient, key string, fn fun
 	}
 	// 如果 err 为 nil，表示 key 在 redis 中已经存在
 	if err == nil {
-		// 如果 value 的值为“占位符”，则返回 redis.Nil 错误
-		if value == opts.Placeholder {
-			return value, redis.Nil
-		}
 		// 返回数据
 		return value, nil
 	}
@@ -124,17 +128,13 @@ func fetch(ctx context.Context, client redis.UniversalClient, key string, fn fun
 		}()
 	}
 
-	// 添加用于从“数据源”获取数据锁成功或失败，都再次从 redis 加载数据
+	// 再次从 redis 加载数据
 	// 如果返回了非 redis.Nil 错误，则直接返回
 	if value, err = client.Get(ctx, key).Result(); err != nil && !errors.Is(err, redis.Nil) {
 		return value, err
 	}
 	// 如果 err 为 nil，表示 key 在 redis 中已经存在
 	if err == nil {
-		// 如果 value 的值为“占位符”，则返回 redis.Nil 错误
-		if value == opts.Placeholder {
-			return value, redis.Nil
-		}
 		// 返回数据
 		return value, nil
 	}
@@ -147,15 +147,14 @@ func fetch(ctx context.Context, client redis.UniversalClient, key string, fn fun
 		client.SetNX(ctx, key, opts.Placeholder, opts.PlaceholderExpiration)
 
 		// 从“数据源”读取数据
-		var expiration time.Duration
-		if value, expiration, err = fn(ctx); err != nil {
+		if value, err = fn(ctx); err != nil {
 			// 从“数据源”读取数据返回 err，写入“占位符”
 			//client.SetNX(ctx, key, opts.Placeholder, opts.PlaceholderExpiration)
 			return value, err
 		}
 
 		// 从“数据源”读取数据成功，将数据写入缓存
-		if err = client.Set(ctx, key, value, expiration).Err(); err != nil {
+		if err = client.Set(ctx, key, value, opts.Expiration).Err(); err != nil {
 			return value, err
 		}
 		return value, nil

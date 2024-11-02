@@ -3,13 +3,12 @@ package dbr
 import (
 	"context"
 	"github.com/redis/go-redis/v9"
-	"time"
 )
 
 type UniversalClient interface {
 	redis.UniversalClient
 
-	Fetch(ctx context.Context, key string, fn func(context.Context) (string, time.Duration, error), opts ...FetchOption) (value string, err error)
+	Fetch(ctx context.Context, key string, fn func(context.Context) (string, error), opts ...FetchOption) (value string, err error)
 }
 
 type Client struct {
