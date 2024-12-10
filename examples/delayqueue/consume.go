@@ -27,7 +27,7 @@ func main() {
 	err = queue.StartConsume(context.Background(), func(m *delayqueue.Message) bool {
 		//fmt.Println(time.Now().UnixMilli(), "Consume Begin", m.ID(), m.UUID(), m.Body(), m.DeliverAt())
 		//time.Sleep(time.Second * 5)
-		fmt.Println(time.Now().UnixMilli(), "Consume End", m.ID(), m.UUID(), m.Body(), m.DeliverAt())
+		fmt.Println(time.Now().UnixMilli(), "Consume End", m.ID(), m.UUID(), m.Body())
 		return true
 	})
 	if err != nil {

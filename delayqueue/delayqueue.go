@@ -5,7 +5,6 @@ import (
 	"errors"
 	"github.com/redis/go-redis/v9"
 	"github.com/smartwalle/dbr/delayqueue/internal"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -246,7 +245,7 @@ func (q *DelayQueue) consumeMessage(ctx context.Context, uuid string, handler Ha
 		return nil
 	}
 
-	var data, err = q.client.HMGet(ctx, internal.MessageKey(q.name, uuid), "id", "uuid", "qn", "bd", "dt").Result()
+	var data, err = q.client.HMGet(ctx, internal.MessageKey(q.name, uuid), "id", "uuid", "qn", "bd").Result()
 	if err != nil {
 		return err
 	}
@@ -256,9 +255,6 @@ func (q *DelayQueue) consumeMessage(ctx context.Context, uuid string, handler Ha
 	m.uuid, _ = data[1].(string)
 	m.queue, _ = data[2].(string)
 	m.body, _ = data[3].(string)
-
-	var deliverAt, _ = data[4].(string)
-	m.deliverAt, _ = strconv.ParseInt(deliverAt, 10, 64)
 
 	if ok := handler(m); ok {
 		return q.ack(ctx, uuid)

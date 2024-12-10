@@ -36,10 +36,6 @@ func (m *Message) Body() string {
 	return m.body
 }
 
-func (m *Message) DeliverAt() int64 {
-	return m.deliverAt
-}
-
 type MessageOption func(m *Message)
 
 func WithDeliverAt(deliverAt time.Time) MessageOption {
