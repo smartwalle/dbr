@@ -39,6 +39,24 @@ func WithFetchInterval(d time.Duration) Option {
 	}
 }
 
+func WithHeartbeatInterval(d time.Duration) Option {
+	return func(delayTask *DelayTask) {
+		if d <= 10 {
+			d = time.Second * 30
+		}
+		delayTask.fetchInterval = d
+	}
+}
+
+func WithMaxInFlight(maximum int) Option {
+	return func(delayTask *DelayTask) {
+		if maximum <= 0 {
+			maximum = 1
+		}
+		delayTask.maxInFlight = maximum
+	}
+}
+
 type DelayTask struct {
 	cancel func()
 
@@ -54,9 +72,10 @@ type DelayTask struct {
 	consumerKey      string
 	messagePrefixKey string
 
-	fetchLimit         int           // 单次最大消费量限制
-	fetchInterval      time.Duration // 消费间隔时间
-	consumerTimeToLive time.Duration // 消费者存活时间
+	fetchLimit        int           // 单次最大消费量限制
+	fetchInterval     time.Duration // 消费间隔时间
+	heartbeatInterval time.Duration // 消费者心跳间隔
+	maxInFlight       int           // 同时最多处理消息数量
 }
 
 var (
@@ -78,8 +97,9 @@ func New(client redis.UniversalClient, queue string, opts ...Option) *DelayTask 
 	delayTask.messagePrefixKey = internal.MessagePrefixKey(queue)
 
 	delayTask.fetchLimit = 1000
-	delayTask.fetchInterval = time.Second           // 默认1秒
-	delayTask.consumerTimeToLive = time.Second * 60 // 默认60秒
+	delayTask.fetchInterval = time.Second          // 默认1秒
+	delayTask.heartbeatInterval = time.Second * 30 // 默认30秒
+	delayTask.maxInFlight = 1                      // 默认1
 	for _, opt := range opts {
 		if opt != nil {
 			opt(delayTask)
@@ -216,10 +236,25 @@ func (delayTask *DelayTask) nack(ctx context.Context, uuid string) error {
 	return nil
 }
 
+func (delayTask *DelayTask) initConsumer(ctx context.Context) error {
+	value, err := delayTask.client.ZAddNX(
+		ctx,
+		delayTask.consumerKey,
+		redis.Z{Member: delayTask.uuid, Score: float64(time.Now().UnixMilli() + delayTask.heartbeatInterval.Milliseconds()*2)},
+	).Result()
+	if err != nil {
+		return err
+	}
+	if value != 1 {
+		return ErrConsumerExists
+	}
+	return nil
+}
+
 func (delayTask *DelayTask) keepConsumer(ctx context.Context) error {
 	if err := delayTask.client.ZAddXX(ctx,
 		delayTask.consumerKey,
-		redis.Z{Member: delayTask.uuid, Score: float64(time.Now().UnixMilli() + delayTask.consumerTimeToLive.Milliseconds())},
+		redis.Z{Member: delayTask.uuid, Score: float64(time.Now().UnixMilli() + delayTask.heartbeatInterval.Milliseconds()*2)},
 	).Err(); err != nil {
 		return err
 	}
@@ -302,24 +337,16 @@ func (delayTask *DelayTask) Start(ctx context.Context) (err error) {
 
 	ctx, delayTask.cancel = context.WithCancel(ctx)
 
-	// 初始消费者信息
-	value, err := delayTask.client.ZAddNX(
-		ctx,
-		delayTask.consumerKey,
-		redis.Z{Member: delayTask.uuid, Score: float64(time.Now().UnixMilli() + delayTask.consumerTimeToLive.Milliseconds())},
-	).Result()
-	if err != nil {
+	// 初始消费者
+	if err = delayTask.initConsumer(ctx); err != nil {
 		return err
-	}
-	if value != 1 {
-		return ErrConsumerExists
 	}
 
 	group, ctx := errgroup.WithContext(ctx)
 
-	// 上报消费者
+	// 定时上报消费者
 	group.Go(func() error {
-		var ticker = time.NewTicker(delayTask.consumerTimeToLive / 2)
+		var ticker = time.NewTicker(delayTask.heartbeatInterval)
 		for {
 			select {
 			case <-ctx.Done():
@@ -344,19 +371,21 @@ func (delayTask *DelayTask) Start(ctx context.Context) (err error) {
 	})
 
 	// 消费消息
-	group.Go(func() error {
-		var ticker = time.NewTicker(delayTask.fetchInterval)
-		for {
-			select {
-			case <-ctx.Done():
-				return nil
-			case <-ticker.C:
-				if nErr := delayTask.consume(ctx); nErr != nil {
-					return nErr
+	for i := 0; i < delayTask.maxInFlight; i++ {
+		group.Go(func() error {
+			var ticker = time.NewTicker(delayTask.fetchInterval)
+			for {
+				select {
+				case <-ctx.Done():
+					return nil
+				case <-ticker.C:
+					if nErr := delayTask.consume(ctx); nErr != nil {
+						return nErr
+					}
 				}
 			}
-		}
-	})
+		})
+	}
 
 	if err = group.Wait(); err != nil {
 		return err
