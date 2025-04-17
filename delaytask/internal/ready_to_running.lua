@@ -19,7 +19,7 @@ if (consumerTimeout ~= nil and consumerTimeout ~= '') then
     -- 获取消息 uuid
     local uuid = redis.call('HGET', mKey, 'uuid')
     -- 设置消费者id
-    redis.call('HSET', mKey, 'cid', ARGV[1])
+    redis.call('HSET', mKey, 'consumer', ARGV[1])
     -- 添加到[处理中队列]
     redis.call('ZADD', KEYS[2], consumerTimeout, mKey)
     return uuid

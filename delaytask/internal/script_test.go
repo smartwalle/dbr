@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
-	"github.com/smartwalle/dbr/delayqueue/internal"
+	"github.com/smartwalle/dbr/delaytask/internal"
 	"os"
 	"testing"
 	"time"

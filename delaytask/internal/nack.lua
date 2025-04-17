@@ -16,19 +16,19 @@ if (found == 0) then
 end
 
 -- 清除消费者id
-redis.call('HSET', mKey, 'cid', '')
+redis.call('HSET', mKey, 'consumer', '')
 
 -- 获取消息 uuid
 local uuid = redis.call('HGET', mKey, 'uuid')
 
 -- 获取剩余重试次数
-local retryRemainCount = redis.call('HGET', mKey, 'rr')
+local retryRemainCount = redis.call('HGET', mKey, 'retry_remain')
 if retryRemainCount ~= nil and retryRemainCount ~= '' and tonumber(retryRemainCount) > 0 then
     -- 剩余重试次数大于 0
     -- 更新剩余重试次数
-    redis.call('HINCRBY', mKey, 'rr', -1)
+    redis.call('HINCRBY', mKey, 'retry_remain', -1)
     -- 清除消费者id
-    redis.call('HSET', mKey, 'cid', '')
+    redis.call('HSET', mKey, 'consumer', '')
 
     -- 获取当前时间
     local now = redis.call('TIME')
@@ -37,7 +37,7 @@ if retryRemainCount ~= nil and retryRemainCount ~= '' and tonumber(retryRemainCo
     local retryTime = milliseconds
 
     -- 获取重试延迟时间
-    local retryDelay = redis.call('HGET', mKey, 'rd')
+    local retryDelay = redis.call('HGET', mKey, 'retry_delay')
     if retryDelay ~= nil and retryDelay ~= '' and tonumber(retryDelay) > 0 then
         retryTime = retryTime + tonumber(retryDelay) * 1000
     end

@@ -1,4 +1,4 @@
-package delayqueue
+package delaytask
 
 import (
 	"github.com/google/uuid"
@@ -13,11 +13,11 @@ func NewUUID() string {
 type Message struct {
 	id          string // 消息 id - id
 	uuid        string // 消息 uuid - uuid
-	queue       string // 队列名称 - qn
-	body        string // 消息内容 - bd
-	retryRemain int    // 剩余重试次数 - rr
-	retryDelay  int    // 重试延迟时间（秒）- rd
-	deliverAt   int64  // 消费时间（投递时间）- dt
+	queue       string // 队列名称 - queue
+	body        string // 消息内容 - body
+	retryRemain int    // 剩余重试次数 - retry_remain
+	retryDelay  int    // 重试延迟时间（秒）- retry_delay
+	deliverAt   int64  // 投递时间（毫秒） - deliver_at
 }
 
 func (m *Message) ID() string {
@@ -60,9 +60,9 @@ func WithBody(body string) MessageOption {
 	}
 }
 
-func WithMaxRetry(maxRetry int) MessageOption {
+func WithMaxRetries(retries int) MessageOption {
 	return func(m *Message) {
-		m.retryRemain = maxRetry
+		m.retryRemain = retries
 	}
 }
 

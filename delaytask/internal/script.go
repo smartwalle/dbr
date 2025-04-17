@@ -8,13 +8,13 @@ import (
 // 消息结构(hash)
 // id -- 消息业务id
 // uuid -- 消息唯一id
-// dt -- 消费时间（投递时间）
-// qn -- 队列名称
-// bd -- 消息内容
-// rr -- 剩余重试次数
-// rd -- 重试延迟时间（秒）
-// ct -- 消息创建时间
-// cid -- 当前消费者id
+// deliver_at -- 投递时间（毫秒）
+// queue -- 队列名称
+// body -- 消息内容
+// retry_remain -- 剩余重试次数
+// retry_delay -- 重试延迟时间（秒）
+// created_at -- 消息创建时间
+// consumer -- 当前消费者
 
 // 待消费队列(sorted set) - member: MessageKey(id)，score: 消费时间
 // 就绪队列(list) - element: MessageKey(uuid)
