@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-type Handler func(m *Message) bool
+type Handler func(ctx context.Context, message *Message) bool
 
 type Option func(delayTask *DelayTask)
 
@@ -288,14 +288,14 @@ func (delayTask *DelayTask) consumeMessage(ctx context.Context, uuid string) err
 		return err
 	}
 
-	var m = &Message{}
-	m.id, _ = raw[0].(string)
-	m.uuid, _ = raw[1].(string)
-	m.queue, _ = raw[2].(string)
-	m.body, _ = raw[3].(string)
+	var message = &Message{}
+	message.id, _ = raw[0].(string)
+	message.uuid, _ = raw[1].(string)
+	message.queue, _ = raw[2].(string)
+	message.body, _ = raw[3].(string)
 
 	if delayTask.handler != nil {
-		if ok := delayTask.handler(m); ok {
+		if ok := delayTask.handler(ctx, message); ok {
 			return delayTask.ack(ctx, uuid)
 		}
 	}

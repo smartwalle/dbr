@@ -22,8 +22,8 @@ func main() {
 		rClient,
 		"mail",
 		delaytask.WithFetchInterval(time.Millisecond*500),
-		delaytask.WithHandler(func(m *delaytask.Message) bool {
-			fmt.Println(time.Now().UnixMilli(), "Consume End", m.ID(), m.UUID(), m.Body())
+		delaytask.WithHandler(func(ctx context.Context, message *delaytask.Message) bool {
+			fmt.Println(time.Now().UnixMilli(), "Consume End", message.ID(), message.UUID(), message.Body())
 			return true
 		}),
 	)
