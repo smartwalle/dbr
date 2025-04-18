@@ -74,7 +74,7 @@ type DelayTask struct {
 
 	fetchLimit        int           // 单次将消息从[待消费队列]转移到[就绪队列]的最大数量
 	fetchInterval     time.Duration // 查询可处理消息间隔时间，当[就绪队列]中没有消息，等待多久进行下一次查询
-	heartbeatInterval time.Duration // 消费者心跳间隔时间，消息者存活时间为 heartbeatInterval * 2
+	heartbeatInterval time.Duration // 消费者心跳间隔时间，消息者存活时间为 heartbeatInterval * 2，对于处理同一任务的消费者，其 heartbeatInterval 需设置为一样，否则会出现错误
 	maxInFlight       int           // 同时处理消息数量，即处理消息 Goroutine 数量
 }
 
@@ -350,7 +350,7 @@ func (delayTask *DelayTask) Start(ctx context.Context) (err error) {
 		for {
 			select {
 			case <-ctx.Done():
-				return nil
+				return delayTask.Stop(context.WithoutCancel(ctx))
 			case <-ticker.C:
 				// 上报消费者存活状态
 				if nErr := delayTask.keepConsumer(ctx); nErr != nil {
@@ -391,7 +391,7 @@ func (delayTask *DelayTask) Start(ctx context.Context) (err error) {
 		return err
 	}
 
-	return delayTask.Stop(context.WithoutCancel(ctx))
+	return nil
 }
 
 func (delayTask *DelayTask) Stop(ctx context.Context) (err error) {
