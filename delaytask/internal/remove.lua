@@ -5,4 +5,4 @@
 -- 从[待消费队列]删除
 redis.call('ZREM', KEYS[1], ARGV[1])
 -- 删除消息结构
-redis.call('DEL', KEYS[2])
+return redis.call('DEL', KEYS[2])

@@ -6,7 +6,6 @@ import (
 	"github.com/redis/go-redis/v9"
 	"github.com/smartwalle/dbr/delaytask/internal"
 	"golang.org/x/sync/errgroup"
-	"strings"
 	"sync/atomic"
 	"time"
 )
@@ -74,7 +73,7 @@ type DelayTask struct {
 
 	fetchLimit        int           // 单次将消息从[待消费队列]转移到[就绪队列]的最大数量
 	fetchInterval     time.Duration // 查询可处理消息间隔时间，当[就绪队列]中没有消息，等待多久进行下一次查询
-	heartbeatInterval time.Duration // 消费者心跳间隔时间，消息者存活时间为 heartbeatInterval * 2，对于处理同一任务的消费者，其 heartbeatInterval 需设置为一样，否则会出现错误
+	heartbeatInterval time.Duration // 消费者心跳间隔时间，消息者存活时间为 heartbeatInterval * 2
 	maxInFlight       int           // 同时处理消息数量，即处理消息 Goroutine 数量
 }
 
@@ -113,7 +112,6 @@ func (delayTask *DelayTask) UUID() string {
 }
 
 func (delayTask *DelayTask) Enqueue(ctx context.Context, id string, opts ...MessageOption) error {
-	id = strings.TrimSpace(id)
 	if id == "" {
 		return ErrInvalidMessage
 	}
@@ -141,14 +139,14 @@ func (delayTask *DelayTask) Enqueue(ctx context.Context, id string, opts ...Mess
 		m.retryRemain,
 		m.retryDelay,
 	}
-	if _, err := internal.ScheduleScript.Run(ctx, delayTask.client, keys, args).Result(); err != nil && !errors.Is(err, redis.Nil) {
+	_, err := internal.ScheduleScript.Run(ctx, delayTask.client, keys, args...).Result()
+	if err != nil {
 		return err
 	}
 	return nil
 }
 
 func (delayTask *DelayTask) Remove(ctx context.Context, id string) error {
-	id = strings.TrimSpace(id)
 	if id == "" {
 		return ErrInvalidMessage
 	}
@@ -160,7 +158,8 @@ func (delayTask *DelayTask) Remove(ctx context.Context, id string) error {
 	var args = []interface{}{
 		id,
 	}
-	if _, err := internal.RemoveScript.Run(ctx, delayTask.client, keys, args).Result(); err != nil && !errors.Is(err, redis.Nil) {
+	_, err := internal.RemoveScript.Run(ctx, delayTask.client, keys, args...).Result()
+	if err != nil {
 		return err
 	}
 	return nil
@@ -175,7 +174,8 @@ func (delayTask *DelayTask) pendingToReady(ctx context.Context) error {
 	var args = []interface{}{
 		delayTask.fetchLimit,
 	}
-	if _, err := internal.PendingToReadyScript.Run(ctx, delayTask.client, keys, args).Result(); err != nil && !errors.Is(err, redis.Nil) {
+	_, err := internal.PendingToReadyScript.Run(ctx, delayTask.client, keys, args...).Result()
+	if err != nil && !errors.Is(err, redis.Nil) {
 		return err
 	}
 	return nil
@@ -190,7 +190,7 @@ func (delayTask *DelayTask) readyToRunningScript(ctx context.Context) (string, e
 	var args = []interface{}{
 		delayTask.uuid,
 	}
-	raw, err := internal.ReadyToRunningScript.Run(ctx, delayTask.client, keys, args).Result()
+	raw, err := internal.ReadyToRunningScript.Run(ctx, delayTask.client, keys, args...).Result()
 	if err != nil && !errors.Is(err, redis.Nil) {
 		return "", err
 	}
@@ -217,7 +217,7 @@ func (delayTask *DelayTask) ack(ctx context.Context, uuid string) error {
 		internal.MessageKey(delayTask.queue, uuid),
 	}
 	_, err := internal.AckScript.Run(ctx, delayTask.client, keys).Result()
-	if err != nil && !errors.Is(err, redis.Nil) {
+	if err != nil {
 		return err
 	}
 	return nil
@@ -230,18 +230,22 @@ func (delayTask *DelayTask) nack(ctx context.Context, uuid string) error {
 		internal.MessageKey(delayTask.queue, uuid),
 	}
 	_, err := internal.NackScript.Run(ctx, delayTask.client, keys).Result()
-	if err != nil && !errors.Is(err, redis.Nil) {
+	if err != nil {
 		return err
 	}
 	return nil
 }
 
 func (delayTask *DelayTask) initConsumer(ctx context.Context) error {
-	value, err := delayTask.client.ZAddNX(
-		ctx,
+	var keys = []string{
 		delayTask.consumerKey,
-		redis.Z{Member: delayTask.uuid, Score: float64(time.Now().UnixMilli() + delayTask.heartbeatInterval.Milliseconds()*2)},
-	).Result()
+	}
+	var args = []interface{}{
+		delayTask.uuid,
+		time.Now().UnixMilli() + delayTask.heartbeatInterval.Milliseconds()*2,
+	}
+
+	value, err := internal.InitConsumerScript.Run(ctx, delayTask.client, keys, args...).Int()
 	if err != nil {
 		return err
 	}
@@ -252,10 +256,34 @@ func (delayTask *DelayTask) initConsumer(ctx context.Context) error {
 }
 
 func (delayTask *DelayTask) keepConsumer(ctx context.Context) error {
-	if err := delayTask.client.ZAddXX(ctx,
+	var keys = []string{
 		delayTask.consumerKey,
-		redis.Z{Member: delayTask.uuid, Score: float64(time.Now().UnixMilli() + delayTask.heartbeatInterval.Milliseconds()*2)},
-	).Err(); err != nil {
+	}
+	var args = []interface{}{
+		delayTask.uuid,
+		time.Now().UnixMilli() + delayTask.heartbeatInterval.Milliseconds()*2,
+	}
+
+	value, err := internal.KeepConsumerScript.Run(ctx, delayTask.client, keys, args...).Int()
+	if err != nil {
+		return err
+	}
+	if value != 1 {
+		return ErrConsumerClosed
+	}
+	return nil
+}
+
+func (delayTask *DelayTask) removeConsumer(ctx context.Context) error {
+	var keys = []string{
+		delayTask.consumerKey,
+	}
+	var args = []interface{}{
+		delayTask.uuid,
+	}
+
+	_, err := internal.RemoveConsumerScript.Run(ctx, delayTask.client, keys, args...).Int()
+	if err != nil {
 		return err
 	}
 	return nil
@@ -266,7 +294,7 @@ func (delayTask *DelayTask) clearConsumer(ctx context.Context) error {
 		delayTask.consumerKey,
 	}
 	_, err := internal.ClearConsumerScript.Run(ctx, delayTask.client, keys).Result()
-	if err != nil && !errors.Is(err, redis.Nil) {
+	if err != nil {
 		return err
 	}
 	return nil
@@ -402,7 +430,7 @@ func (delayTask *DelayTask) Stop(ctx context.Context) (err error) {
 	if delayTask.cancel != nil {
 		delayTask.cancel()
 	}
-	if err = delayTask.client.ZRem(ctx, delayTask.consumerKey, delayTask.uuid).Err(); err != nil {
+	if err = delayTask.removeConsumer(ctx); err != nil {
 		return err
 	}
 	return nil

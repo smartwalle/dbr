@@ -62,6 +62,24 @@ var nackScript string
 // NackScript 消费失败
 var NackScript = redis.NewScript(nackScript)
 
+//go:embed init_consumer.lua
+var initConsumerScript string
+
+// InitConsumerScript 初始消费者
+var InitConsumerScript = redis.NewScript(initConsumerScript)
+
+//go:embed keep_consumer.lua
+var keeyConsumerScript string
+
+// KeepConsumerScript 上报消费者
+var KeepConsumerScript = redis.NewScript(keeyConsumerScript)
+
+//go:embed remove_consumer.lua
+var removeConsumerScript string
+
+// RemoveConsumerScript 删除消费者
+var RemoveConsumerScript = redis.NewScript(removeConsumerScript)
+
 //go:embed clear_consumer.lua
 var clearConsumerScript string
 

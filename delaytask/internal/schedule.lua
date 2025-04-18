@@ -15,4 +15,4 @@ redis.call('ZADD', KEYS[1], ARGV[3], ARGV[1])
 local now = redis.call('TIME')
 local second = tonumber(now[1])
 -- 写入消息结构
-redis.call('HMSET', KEYS[2], 'id', ARGV[1], 'uuid', ARGV[2], 'deliver_at', ARGV[3], 'queue', ARGV[4], 'body', ARGV[5], 'retry_remain', ARGV[6], 'retry_delay', ARGV[7], 'created_at', second)
+return redis.call('HSET', KEYS[2], 'id', ARGV[1], 'uuid', ARGV[2], 'deliver_at', ARGV[3], 'queue', ARGV[4], 'body', ARGV[5], 'retry_remain', ARGV[6], 'retry_delay', ARGV[7], 'created_at', second)
