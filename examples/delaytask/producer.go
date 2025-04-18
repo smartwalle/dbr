@@ -17,7 +17,7 @@ func main() {
 
 	var task = delaytask.New(rClient, "mail")
 
-	for i := 0; i < 10; i++ {
-		fmt.Println(i, task.Enqueue(context.Background(), fmt.Sprintf("%d", i), delaytask.WithDeliverAfter(1), delaytask.WithMaxRetries(3), delaytask.WithRetryDelay(5), delaytask.WithBody(fmt.Sprintf("body-%d", i))))
+	for i := 0; i < 1000; i++ {
+		fmt.Println(i, task.Schedule(context.Background(), fmt.Sprintf("%d", i), delaytask.WithDeliverAfter(1), delaytask.WithMaxRetries(3), delaytask.WithRetryDelay(5), delaytask.WithBody(fmt.Sprintf("body-%d", i))))
 	}
 }

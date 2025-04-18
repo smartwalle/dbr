@@ -20,17 +20,23 @@ import (
 // 就绪队列(list) - element: MessageKey(uuid)
 // 处理中队列(sorted set) - member: MessageKey(uuid), score: 确认处理成功超时时间
 
-//go:embed schedule.lua
-var scheduleScript string
+//go:embed schedule_message.lua
+var scheduleMessageScript string
 
-// ScheduleScript 添加消息
-var ScheduleScript = redis.NewScript(scheduleScript)
+// ScheduleMessageScript 添加消息
+var ScheduleMessageScript = redis.NewScript(scheduleMessageScript)
 
-//go:embed remove.lua
-var removeScript string
+//go:embed remove_message.lua
+var removeMessageScript string
 
-// RemoveScript 删除消息
-var RemoveScript = redis.NewScript(removeScript)
+// RemoveMessageScript 删除消息
+var RemoveMessageScript = redis.NewScript(removeMessageScript)
+
+//go:embed message.lua
+var messageScript string
+
+// MessageScript 消息信息
+var MessageScript = redis.NewScript(messageScript)
 
 //go:embed pending_to_ready.lua
 var pendingToReadyScript string

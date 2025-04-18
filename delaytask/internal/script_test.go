@@ -55,7 +55,7 @@ func Test_ScheduleScript(t *testing.T) {
 		"message body",
 		2,
 	}
-	raw, err := internal.ScheduleScript.Run(context.Background(), redisClient, keys, args...).Result()
+	raw, err := internal.ScheduleMessageScript.Run(context.Background(), redisClient, keys, args...).Result()
 	if err != nil && !errors.Is(err, redis.Nil) {
 		t.Fatal(err)
 	}
@@ -72,7 +72,7 @@ func Test_RemoveScript(t *testing.T) {
 	var args = []interface{}{
 		id,
 	}
-	raw, err := internal.RemoveScript.Run(context.Background(), redisClient, keys, args...).Result()
+	raw, err := internal.RemoveMessageScript.Run(context.Background(), redisClient, keys, args...).Result()
 	if err != nil && !errors.Is(err, redis.Nil) {
 		t.Fatal(err)
 	}

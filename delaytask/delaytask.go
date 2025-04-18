@@ -111,7 +111,7 @@ func (delayTask *DelayTask) UUID() string {
 	return delayTask.uuid
 }
 
-func (delayTask *DelayTask) Enqueue(ctx context.Context, id string, opts ...MessageOption) error {
+func (delayTask *DelayTask) Schedule(ctx context.Context, id string, opts ...MessageOption) error {
 	if id == "" {
 		return ErrInvalidMessage
 	}
@@ -139,7 +139,7 @@ func (delayTask *DelayTask) Enqueue(ctx context.Context, id string, opts ...Mess
 		m.retryRemain,
 		m.retryDelay,
 	}
-	_, err := internal.ScheduleScript.Run(ctx, delayTask.client, keys, args...).Result()
+	_, err := internal.ScheduleMessageScript.Run(ctx, delayTask.client, keys, args...).Result()
 	if err != nil {
 		return err
 	}
@@ -158,7 +158,7 @@ func (delayTask *DelayTask) Remove(ctx context.Context, id string) error {
 	var args = []interface{}{
 		id,
 	}
-	_, err := internal.RemoveScript.Run(ctx, delayTask.client, keys, args...).Result()
+	_, err := internal.RemoveMessageScript.Run(ctx, delayTask.client, keys, args...).Result()
 	if err != nil {
 		return err
 	}
@@ -311,16 +311,20 @@ func (delayTask *DelayTask) consumeMessage(ctx context.Context, uuid string) err
 		return nil
 	}
 
-	raw, err := delayTask.client.HMGet(ctx, internal.MessageKey(delayTask.queue, uuid), "id", "uuid", "queue", "body").Result()
+	var keys = []string{
+		internal.MessageKey(delayTask.queue, uuid),
+	}
+
+	raw, err := internal.MessageScript.Run(ctx, delayTask.client, keys).StringSlice()
 	if err != nil {
 		return err
 	}
 
 	var message = &Message{}
-	message.id, _ = raw[0].(string)
-	message.uuid, _ = raw[1].(string)
-	message.queue, _ = raw[2].(string)
-	message.body, _ = raw[3].(string)
+	message.id = raw[0]
+	message.uuid = raw[1]
+	message.queue = raw[2]
+	message.body = raw[3]
 
 	if delayTask.handler != nil {
 		if ok := delayTask.handler(ctx, message); ok {
