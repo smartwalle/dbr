@@ -1,7 +1,7 @@
 -- KEYS[1] - 就绪队列
 -- KEYS[2] - 处理中队列
 -- KEYS[3] - 消费者队列
--- ARGV[1] - 消费者id
+-- ARGV[1] - 消费者
 
 local mKey = redis.call('LPOP', KEYS[1])
 if (not mKey) then
@@ -18,7 +18,7 @@ local consumerTimeout = redis.call('ZSCORE', KEYS[3], ARGV[1])
 if (consumerTimeout ~= nil and consumerTimeout ~= '') then
     -- 获取消息 uuid
     local uuid = redis.call('HGET', mKey, 'uuid')
-    -- 设置消费者id
+    -- 设置消费者
     redis.call('HSET', mKey, 'consumer', ARGV[1])
     -- 添加到[处理中队列]
     redis.call('ZADD', KEYS[2], consumerTimeout, mKey)

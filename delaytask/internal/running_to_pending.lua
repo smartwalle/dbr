@@ -9,7 +9,7 @@ local toRetry = function(mKey, now)
         return
     end
 
-    -- 获取消费者id
+    -- 获取消费者
     local consumer = redis.call('HGET', mKey, 'consumer')
     if (consumer ~= nil and consumer ~= '') then
         -- 获取消费者的有效时间
@@ -30,7 +30,7 @@ local toRetry = function(mKey, now)
         -- 剩余重试次数大于 0
         -- 更新剩余重试次数
         redis.call('HINCRBY', mKey, 'retry_remain', -1)
-        -- 清除消费者id
+        -- 清除消费者
         redis.call('HSET', mKey, 'consumer', '')
 
         local retryTime = now

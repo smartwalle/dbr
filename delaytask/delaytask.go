@@ -30,21 +30,21 @@ func WithFetchLimit(limit int) Option {
 	}
 }
 
-func WithFetchInterval(d time.Duration) Option {
+func WithFetchInterval(interval time.Duration) Option {
 	return func(delayTask *DelayTask) {
-		if d <= 0 {
-			d = time.Second
+		if interval <= 0 {
+			interval = time.Second
 		}
-		delayTask.fetchInterval = d
+		delayTask.fetchInterval = interval
 	}
 }
 
-func WithHeartbeatInterval(d time.Duration) Option {
+func WithHeartbeatInterval(interval time.Duration) Option {
 	return func(delayTask *DelayTask) {
-		if d <= 10 {
-			d = time.Second * 30
+		if interval <= 10 {
+			interval = time.Second * 30
 		}
-		delayTask.fetchInterval = d
+		delayTask.fetchInterval = interval
 	}
 }
 
@@ -72,10 +72,10 @@ type DelayTask struct {
 	consumerKey      string
 	messagePrefixKey string
 
-	fetchLimit        int           // 单次最大消费量限制
-	fetchInterval     time.Duration // 消费间隔时间
-	heartbeatInterval time.Duration // 消费者心跳间隔
-	maxInFlight       int           // 同时最多处理消息数量
+	fetchLimit        int           // 单次将消息从[待消费队列]转移到[就绪队列]的最大数量
+	fetchInterval     time.Duration // 查询可处理消息间隔时间，当[就绪队列]中没有消息，等待多久进行下一次查询
+	heartbeatInterval time.Duration // 消费者心跳间隔时间，消息者存活时间为 heartbeatInterval * 2
+	maxInFlight       int           // 同时处理消息数量，即处理消息 Goroutine 数量
 }
 
 var (

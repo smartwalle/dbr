@@ -15,7 +15,7 @@ if (found == 0) then
     return ''
 end
 
--- 清除消费者id
+-- 清除消费者
 redis.call('HSET', mKey, 'consumer', '')
 
 -- 获取消息 uuid
@@ -27,7 +27,7 @@ if retryRemainCount ~= nil and retryRemainCount ~= '' and tonumber(retryRemainCo
     -- 剩余重试次数大于 0
     -- 更新剩余重试次数
     redis.call('HINCRBY', mKey, 'retry_remain', -1)
-    -- 清除消费者id
+    -- 清除消费者
     redis.call('HSET', mKey, 'consumer', '')
 
     -- 获取当前时间
