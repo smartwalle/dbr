@@ -37,10 +37,9 @@ func main() {
 		fmt.Println("消费结束")
 	}()
 
-	var c = make(chan os.Signal, 1)
-	signal.Notify(c, syscall.SIGTERM, syscall.SIGQUIT, syscall.SIGINT)
-
+	var sig = make(chan os.Signal, 1)
+	signal.Notify(sig, syscall.SIGTERM, syscall.SIGQUIT, syscall.SIGINT)
 	select {
-	case <-c:
+	case <-sig:
 	}
 }
