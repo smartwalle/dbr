@@ -19,8 +19,8 @@ type fetchOptions struct {
 	Placeholder           []byte
 	PlaceholderExpiration time.Duration
 
-	MaxRetries int
-	RetryDelay time.Duration
+	MaxAttempts int
+	RetryDelay  time.Duration
 
 	LoadDataTimeout time.Duration
 }
@@ -54,12 +54,12 @@ func WithRetryDelay(delay time.Duration) FetchOption {
 	}
 }
 
-func WithMaxRetries(retries int) FetchOption {
+func WithMaxAttempts(attempts int) FetchOption {
 	return func(opts *fetchOptions) {
-		if retries <= 0 {
-			retries = 3
+		if attempts <= 0 {
+			attempts = 3
 		}
-		opts.MaxRetries = retries
+		opts.MaxAttempts = attempts
 	}
 }
 
@@ -76,7 +76,7 @@ func Fetch(ctx context.Context, client redis.UniversalClient, key string, fn fun
 	var nOpts = &fetchOptions{}
 	nOpts.Placeholder = []byte("-")
 	nOpts.PlaceholderExpiration = time.Minute * 5
-	nOpts.MaxRetries = 3
+	nOpts.MaxAttempts = 3
 	nOpts.RetryDelay = time.Millisecond * 50
 	nOpts.LoadDataTimeout = time.Second * 2
 	for _, opt := range opts {
@@ -84,8 +84,8 @@ func Fetch(ctx context.Context, client redis.UniversalClient, key string, fn fun
 			opt(nOpts)
 		}
 	}
-	if nOpts.LoadDataTimeout < nOpts.RetryDelay*time.Duration(nOpts.MaxRetries) {
-		nOpts.LoadDataTimeout += nOpts.RetryDelay * time.Duration(nOpts.MaxRetries)
+	if nOpts.LoadDataTimeout < nOpts.RetryDelay*time.Duration(nOpts.MaxAttempts) {
+		nOpts.LoadDataTimeout += nOpts.RetryDelay * time.Duration(nOpts.MaxAttempts)
 	}
 	return fetch(ctx, client, key, fn, nOpts)
 }
@@ -106,19 +106,19 @@ func fetch(ctx context.Context, client redis.UniversalClient, key string, fn fun
 
 	// 添加用于从“数据源”获取数据锁
 	var lockKey = fmt.Sprintf("%s:lock", key)
-	var runTimes = 0
+	var attempt = 0
 	var locked = false
-	for runTimes <= opts.MaxRetries {
+	for attempt <= opts.MaxAttempts {
 		if locked, err = client.SetNX(ctx, lockKey, fmt.Sprintf("%d-%d", os.Getpid(), time.Now().UnixMilli()), opts.LoadDataTimeout).Result(); err != nil {
 			return value, err
 		}
 		if locked {
 			break
 		}
-		if runTimes < opts.MaxRetries {
+		if attempt < opts.MaxAttempts {
 			time.Sleep(opts.RetryDelay)
 		}
-		runTimes += 1
+		attempt += 1
 	}
 
 	if locked {
