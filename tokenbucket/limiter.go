@@ -5,57 +5,33 @@ import (
 	"fmt"
 	"github.com/redis/go-redis/v9"
 	"github.com/smartwalle/dbr/tokenbucket/internal"
+	"time"
 )
-
-type Option func(limiter *Limiter)
-
-func WithCapacity(capacity int) Option {
-	return func(limiter *Limiter) {
-		if capacity <= 0 {
-			capacity = 10
-		}
-		limiter.capacity = capacity
-	}
-}
-
-func WithRefillRate(rate int) Option {
-	return func(limiter *Limiter) {
-		if rate <= 0 {
-			rate = 1
-		}
-		limiter.rate = rate
-	}
-}
 
 type Limiter struct {
 	client redis.UniversalClient
-	key    string
 
-	capacity int // 令牌桶容量
-	rate     int // 每秒生成令牌数量
+	capacity   int // 令牌桶容量
+	refillRate int // 每秒生成令牌数量
 }
 
-func New(client redis.UniversalClient, name string, opts ...Option) *Limiter {
+func New(client redis.UniversalClient, capacity, refillRate int) *Limiter {
 	var limiter = &Limiter{}
 	limiter.client = client
-	limiter.key = fmt.Sprintf("dbr:tokenbucket:{%s}", name)
-	limiter.capacity = 10
-	limiter.rate = 1
-	for _, opt := range opts {
-		if opt != nil {
-			opt(limiter)
-		}
-	}
+	limiter.capacity = capacity
+	limiter.refillRate = refillRate
 	return limiter
 }
 
-func (limiter *Limiter) Allow(ctx context.Context) bool {
+func (limiter *Limiter) Allow(ctx context.Context, key string) bool {
 	var keys = []string{
-		limiter.key,
+		fmt.Sprintf("dbr:tokenbucket:{%s}", key),
 	}
 	var args = []interface{}{
+		time.Now().Unix(),
 		limiter.capacity,
-		limiter.rate,
+		limiter.refillRate,
+		1,
 	}
 	value, err := internal.AcquireScript.Run(ctx, limiter.client, keys, args...).Bool()
 	if err != nil {
