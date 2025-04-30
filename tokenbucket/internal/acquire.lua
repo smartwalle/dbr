@@ -1,3 +1,6 @@
+-- KEYS[1] - key 名称
+-- ARGV[1] - 令牌桶容量
+-- ARGV[2] - 每秒生成令牌数量
 redis.replicate_commands()
 
 local key = KEYS[1]
