@@ -12,9 +12,9 @@ local rate = tonumber(ARGV[3]) -- 每秒生成令牌数量
 local requested = tonumber(ARGV[4]) -- 消耗令牌数量
 
 -- 获取桶中剩余的令牌数量
-local tokens = tonumber(redis.call('HGET', key, 'tokens') or capacity)
+local tokens = tonumber(redis.call('HGET', key, 'tokens')) or capacity
 -- 获取上次填充令牌桶的时间
-local refillTime = tonumber(redis.call('HGET', key, 'refill_time') or now)
+local refillTime = tonumber(redis.call('HGET', key, 'refill_time')) or now
 -- 计算当前时间和上次填充令牌的时间差
 local elapsedTime = now - refillTime
 -- 计算出当前令牌桶剩余数量
