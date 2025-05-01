@@ -64,6 +64,7 @@ type DelayTask struct {
 	queue      string
 	handler    Handler
 	inShutdown atomic.Bool
+	group      *errgroup.Group
 
 	pengingKey       string
 	readyKey         string
@@ -388,6 +389,8 @@ func (delayTask *DelayTask) Start(ctx context.Context) (err error) {
 
 	group, ctx := errgroup.WithContext(ctx)
 
+	delayTask.group = group
+
 	// 定时上报消费者
 	group.Go(func() error {
 		var ticker = time.NewTicker(delayTask.heartbeatInterval)
@@ -446,6 +449,11 @@ func (delayTask *DelayTask) Stop(ctx context.Context) (err error) {
 	if delayTask.cancel != nil {
 		delayTask.cancel()
 	}
+
+	if delayTask.group != nil {
+		delayTask.group.Wait()
+	}
+
 	if err = delayTask.removeConsumer(ctx); err != nil {
 		return err
 	}
