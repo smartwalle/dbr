@@ -19,7 +19,7 @@ if found == 0 then
 end
 
 -- 获取消费者的有效时间
-local consumerTimeout = tonumber(redis.call('ZSCORE', consumerKey, consumer) or 0)
+local consumerTimeout = tonumber(redis.call('ZSCORE', consumerKey, consumer)) or 0
 if consumerTimeout > 0 then
     -- 获取消息 uuid
     local uuid = redis.call('HGET', mKey, 'uuid')

@@ -7,7 +7,7 @@
 local pendingKey = KEYS[1]
 local readyKey = KEYS[2]
 local messagePrefix = KEYS[3]
-local now = ARGV[1]
+local now = tonumber(ARGV[1])
 local limit = ARGV[2]
 
 local ids = redis.call('ZRANGEBYSCORE', pendingKey, '-inf', now, 'LIMIT', 0, limit)
