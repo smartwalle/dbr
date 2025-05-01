@@ -119,6 +119,7 @@ func (delayTask *DelayTask) Schedule(ctx context.Context, id string, opts ...Mes
 	m.id = id
 	m.uuid = NewUUID()
 	m.queue = delayTask.queue
+	m.deliverAt = time.Now().UnixMilli()
 	m.retryDelay = 5 // 默认 5 秒后重试
 	for _, opt := range opts {
 		if opt != nil {
@@ -138,6 +139,7 @@ func (delayTask *DelayTask) Schedule(ctx context.Context, id string, opts ...Mes
 		m.body,
 		m.retryRemain,
 		m.retryDelay,
+		time.Now().UnixMilli(),
 	}
 	_, err := internal.ScheduleMessageScript.Run(ctx, delayTask.client, keys, args...).Result()
 	if err != nil {
@@ -172,6 +174,7 @@ func (delayTask *DelayTask) pendingToReady(ctx context.Context) error {
 		delayTask.messagePrefixKey,
 	}
 	var args = []interface{}{
+		time.Now().UnixMilli(),
 		delayTask.fetchLimit,
 	}
 	_, err := internal.PendingToReadyScript.Run(ctx, delayTask.client, keys, args...).Result()
@@ -181,7 +184,7 @@ func (delayTask *DelayTask) pendingToReady(ctx context.Context) error {
 	return nil
 }
 
-func (delayTask *DelayTask) readyToRunningScript(ctx context.Context) (string, error) {
+func (delayTask *DelayTask) readyToRunning(ctx context.Context) (string, error) {
 	var keys = []string{
 		delayTask.readyKey,
 		delayTask.runningKey,
@@ -198,13 +201,16 @@ func (delayTask *DelayTask) readyToRunningScript(ctx context.Context) (string, e
 	return uuid, nil
 }
 
-func (delayTask *DelayTask) runningToPendingScript(ctx context.Context) error {
+func (delayTask *DelayTask) runningToPending(ctx context.Context) error {
 	var keys = []string{
 		delayTask.runningKey,
 		delayTask.pengingKey,
 		delayTask.consumerKey,
 	}
-	_, err := internal.RunningToPendingScript.Run(ctx, delayTask.client, keys).Result()
+	var args = []interface{}{
+		time.Now().UnixMilli(),
+	}
+	_, err := internal.RunningToPendingScript.Run(ctx, delayTask.client, keys, args...).Result()
 	if err != nil && !errors.Is(err, redis.Nil) {
 		return err
 	}
@@ -229,7 +235,10 @@ func (delayTask *DelayTask) nack(ctx context.Context, uuid string) error {
 		delayTask.pengingKey,
 		internal.MessageKey(delayTask.queue, uuid),
 	}
-	_, err := internal.NackScript.Run(ctx, delayTask.client, keys).Result()
+	var args = []interface{}{
+		time.Now().UnixMilli(),
+	}
+	_, err := internal.NackScript.Run(ctx, delayTask.client, keys, args...).Result()
 	if err != nil {
 		return err
 	}
@@ -293,7 +302,10 @@ func (delayTask *DelayTask) clearConsumer(ctx context.Context) error {
 	var keys = []string{
 		delayTask.consumerKey,
 	}
-	_, err := internal.ClearConsumerScript.Run(ctx, delayTask.client, keys).Result()
+	var args = []interface{}{
+		time.Now().UnixMilli(),
+	}
+	_, err := internal.ClearConsumerScript.Run(ctx, delayTask.client, keys, args...).Result()
 	if err != nil {
 		return err
 	}
@@ -343,7 +355,7 @@ func (delayTask *DelayTask) consume(ctx context.Context) (err error) {
 
 	// 消费消息
 	for {
-		uuid, err = delayTask.readyToRunningScript(ctx)
+		uuid, err = delayTask.readyToRunning(ctx)
 		if err != nil {
 			return err
 		}
@@ -395,7 +407,7 @@ func (delayTask *DelayTask) Start(ctx context.Context) (err error) {
 				}
 
 				// 处理消费超时的消息
-				if nErr := delayTask.runningToPendingScript(ctx); nErr != nil {
+				if nErr := delayTask.runningToPending(ctx); nErr != nil {
 					return nErr
 				}
 			}

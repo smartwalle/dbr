@@ -24,7 +24,7 @@ func main() {
 		delaytask.WithFetchInterval(time.Millisecond*500),
 		delaytask.WithHandler(func(ctx context.Context, message *delaytask.Message) bool {
 			fmt.Println(time.Now().UnixMilli(), "Consume End", message.ID(), message.UUID(), message.Body())
-			return true
+			return false
 		}),
 	)
 

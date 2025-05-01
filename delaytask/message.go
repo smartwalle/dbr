@@ -41,7 +41,7 @@ type MessageOption func(m *Message)
 func WithDeliverAt(deliverAt time.Time) MessageOption {
 	return func(m *Message) {
 		if deliverAt.IsZero() {
-			m.deliverAt = 0
+			m.deliverAt = time.Now().UnixMilli()
 		} else {
 			m.deliverAt = deliverAt.UnixMilli()
 		}
@@ -50,6 +50,9 @@ func WithDeliverAt(deliverAt time.Time) MessageOption {
 
 func WithDeliverAfter(seconds int64) MessageOption {
 	return func(m *Message) {
+		if seconds < 0 {
+			seconds = 0
+		}
 		m.deliverAt = time.Now().UnixMilli() + (seconds * 1000)
 	}
 }
