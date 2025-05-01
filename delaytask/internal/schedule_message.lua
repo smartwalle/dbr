@@ -9,7 +9,7 @@
  -- ARGV[7] - 重试延迟时间（秒）(retry_delay)
  -- ARGV[8] - 消息创建时间 (created_at)
 
-local deliverAt = tonumber(ARGV[3])
+local deliverAt = ARGV[3]
 
 -- 添加到[待消费队列]
 redis.call('ZADD', KEYS[1], deliverAt, ARGV[1])

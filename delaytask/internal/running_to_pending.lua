@@ -11,7 +11,7 @@ local now = ARGV[1]
 local toRetry = function(mKey)
     -- 判断消息结构是否存在
     local found = redis.call('EXISTS', mKey)
-    if (found == 0) then
+    if found == 0 then
         return
     end
 
