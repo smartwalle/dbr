@@ -11,15 +11,15 @@ import (
 type Limiter struct {
 	client redis.UniversalClient
 
-	capacity   int // 令牌桶容量
-	refillRate int // 每秒生成令牌数量
+	capacity int // 令牌桶容量
+	rate     int // 每秒生成令牌数量
 }
 
-func New(client redis.UniversalClient, capacity, refillRate int) *Limiter {
+func New(client redis.UniversalClient, capacity, rate int) *Limiter {
 	var limiter = &Limiter{}
 	limiter.client = client
 	limiter.capacity = capacity
-	limiter.refillRate = refillRate
+	limiter.rate = rate
 	return limiter
 }
 
@@ -30,7 +30,7 @@ func (limiter *Limiter) Allow(ctx context.Context, key string) bool {
 	var args = []interface{}{
 		time.Now().Unix(),
 		limiter.capacity,
-		limiter.refillRate,
+		limiter.rate,
 		1,
 	}
 	value, err := internal.AcquireScript.Run(ctx, limiter.client, keys, args...).Bool()
