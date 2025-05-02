@@ -5,7 +5,8 @@
 
 local runningKey = KEYS[1]
 local pendingKey = KEYS[2]
-local messageKey = KEYS[3]
+local failureKey = KEYS[3]
+local messageKey = KEYS[4]
 local now = tonumber(ARGV[1])
 
 -- 从[处理中队列]获取消息的分值，主要用于判断该消息是否还存在于[处理中队列]中
@@ -47,7 +48,9 @@ if retryRemain > 0 then
     redis.call('ZADD', pendingKey, retryTime, uuid)
 else
     -- 删除[消息结构]
-    redis.call('DEL', messageKey)
+    --redis.call('DEL', messageKey)
+    -- 添加到[消费失败队列]中
+    redis.call('ZADD', failureKey, now, messageKey)
 end
 -- 从[处理中队列]中删除消息
 redis.call('ZREM', runningKey, messageKey)

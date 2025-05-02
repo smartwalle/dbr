@@ -65,6 +65,9 @@ func WithBody(body string) MessageOption {
 
 func WithMaxRetries(retries int) MessageOption {
 	return func(m *Message) {
+		if retries < 0 {
+			m.retryRemain = 0
+		}
 		m.retryRemain = retries
 	}
 }
@@ -72,7 +75,7 @@ func WithMaxRetries(retries int) MessageOption {
 func WithRetryDelay(seconds int) MessageOption {
 	return func(m *Message) {
 		if seconds <= 0 {
-			m.retryDelay = 5
+			m.retryDelay = 0
 		}
 		m.retryDelay = seconds
 	}

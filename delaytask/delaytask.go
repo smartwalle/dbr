@@ -69,6 +69,7 @@ type DelayTask struct {
 	pengingKey       string
 	readyKey         string
 	runningKey       string
+	failureKey       string
 	consumerKey      string
 	messagePrefixKey string
 
@@ -93,6 +94,7 @@ func New(client redis.UniversalClient, queue string, opts ...Option) *DelayTask 
 	delayTask.pengingKey = internal.PendingKey(queue)
 	delayTask.readyKey = internal.ReadyKey(queue)
 	delayTask.runningKey = internal.RunningKey(queue)
+	delayTask.failureKey = internal.FailureKey(queue)
 	delayTask.consumerKey = internal.ConsumerKey(queue)
 	delayTask.messagePrefixKey = internal.MessagePrefixKey(queue)
 
@@ -206,6 +208,7 @@ func (delayTask *DelayTask) runningToPending(ctx context.Context) error {
 	var keys = []string{
 		delayTask.runningKey,
 		delayTask.pengingKey,
+		delayTask.failureKey,
 		delayTask.consumerKey,
 	}
 	var args = []interface{}{
@@ -234,6 +237,7 @@ func (delayTask *DelayTask) nack(ctx context.Context, uuid string) error {
 	var keys = []string{
 		delayTask.runningKey,
 		delayTask.pengingKey,
+		delayTask.failureKey,
 		internal.MessageKey(delayTask.queue, uuid),
 	}
 	var args = []interface{}{

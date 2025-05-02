@@ -19,6 +19,7 @@ import (
 // 待消费队列(sorted set) - member: MessageKey(id)，score: 消费时间
 // 就绪队列(list) - element: MessageKey(uuid)
 // 处理中队列(sorted set) - member: MessageKey(uuid), score: 确认处理成功超时时间
+// 消费失败队列(list) - element: MessageKey(uuid)
 
 //go:embed schedule_message.lua
 var scheduleMessageScript string

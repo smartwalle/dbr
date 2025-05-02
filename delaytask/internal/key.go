@@ -21,6 +21,11 @@ func RunningKey(queue string) string {
 	return fmt.Sprintf("%s:running", QueueKey(queue))
 }
 
+// FailureKey 用于构建[消费失败队列]名字
+func FailureKey(queue string) string {
+	return fmt.Sprintf("%s:failure", QueueKey(queue))
+}
+
 // ConsumerKey 用于构建[消费者队列]名字
 func ConsumerKey(queue string) string {
 	return fmt.Sprintf("%s:consumer", QueueKey(queue))
