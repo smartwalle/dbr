@@ -398,6 +398,8 @@ func (delayTask *DelayTask) Start(ctx context.Context) (err error) {
 	// 定时上报消费者
 	group.Go(func() error {
 		var ticker = time.NewTicker(delayTask.heartbeatInterval)
+		defer ticker.Stop()
+
 		for {
 			select {
 			case <-ctx.Done():
@@ -425,6 +427,8 @@ func (delayTask *DelayTask) Start(ctx context.Context) (err error) {
 	for i := 0; i < delayTask.maxInFlight; i++ {
 		group.Go(func() error {
 			var ticker = time.NewTicker(delayTask.fetchInterval)
+			defer ticker.Stop()
+
 			for {
 				select {
 				case <-ctx.Done():
