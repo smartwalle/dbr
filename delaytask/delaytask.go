@@ -226,7 +226,7 @@ func (delayTask *DelayTask) ack(ctx context.Context, uuid string) error {
 		delayTask.runningKey,
 		internal.MessageKey(delayTask.queue, uuid),
 	}
-	_, err := internal.AckScript.Run(ctx, delayTask.client, keys).Result()
+	_, err := internal.AckScript.Run(context.WithoutCancel(ctx), delayTask.client, keys).Result()
 	if err != nil {
 		return err
 	}
@@ -243,7 +243,7 @@ func (delayTask *DelayTask) nack(ctx context.Context, uuid string) error {
 	var args = []interface{}{
 		time.Now().UnixMilli(),
 	}
-	_, err := internal.NackScript.Run(ctx, delayTask.client, keys, args...).Result()
+	_, err := internal.NackScript.Run(context.WithoutCancel(ctx), delayTask.client, keys, args...).Result()
 	if err != nil {
 		return err
 	}
@@ -296,7 +296,7 @@ func (delayTask *DelayTask) removeConsumer(ctx context.Context) error {
 		delayTask.uuid,
 	}
 
-	_, err := internal.RemoveConsumerScript.Run(ctx, delayTask.client, keys, args...).Int()
+	_, err := internal.RemoveConsumerScript.Run(context.WithoutCancel(ctx), delayTask.client, keys, args...).Int()
 	if err != nil {
 		return err
 	}
@@ -401,7 +401,7 @@ func (delayTask *DelayTask) Start(ctx context.Context) (err error) {
 		for {
 			select {
 			case <-ctx.Done():
-				return delayTask.Stop(context.WithoutCancel(ctx))
+				return nil
 			case <-ticker.C:
 				// 上报消费者存活状态
 				if nErr := delayTask.keepConsumer(ctx); nErr != nil {
@@ -437,6 +437,8 @@ func (delayTask *DelayTask) Start(ctx context.Context) (err error) {
 			}
 		})
 	}
+
+	defer delayTask.Stop(ctx)
 
 	if err = group.Wait(); err != nil {
 		return err
