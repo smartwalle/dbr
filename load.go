@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/redis/go-redis/v9"
-	"os"
 	"time"
 )
 
@@ -119,7 +118,7 @@ func load(ctx context.Context, client redis.UniversalClient, key string, fn func
 
 	// 添加用于从“数据源”获取数据锁
 	var lockKey = fmt.Sprintf("%s:lock", key)
-	var lockValue = fmt.Sprintf("%d-%d", os.Getpid(), time.Now().UnixMicro())
+	var lockValue = uuid()
 	var attempt = 0
 	var locked = false
 	for {
@@ -177,12 +176,16 @@ func load(ctx context.Context, client redis.UniversalClient, key string, fn func
 	// 添加用于从“数据源”获取数据锁成功
 	if locked {
 		// 写入“占位符”
-		client.SetNX(ctx, key, opts.Placeholder, opts.PlaceholderExpiration)
+		if err = client.SetNX(ctx, key, opts.Placeholder, opts.PlaceholderExpiration).Err(); err != nil {
+			return value, err
+		}
 
 		// 从“数据源”读取数据
 		if value, err = fn(ctx); err != nil {
 			// 从“数据源”读取数据返回 err，写入“占位符”
-			//client.SetNX(ctx, key, opts.Placeholder, opts.PlaceholderExpiration)
+			if err = client.SetNX(ctx, key, opts.Placeholder, opts.PlaceholderExpiration).Err(); err != nil {
+				return value, err
+			}
 			return value, err
 		}
 
