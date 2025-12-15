@@ -183,9 +183,9 @@ func load(ctx context.Context, client redis.UniversalClient, key string, fn func
 		// 从“数据源”读取数据
 		if value, err = fn(ctx); err != nil {
 			// 从“数据源”读取数据返回 err，写入“占位符”
-			if err = client.SetNX(ctx, key, opts.Placeholder, opts.PlaceholderExpiration).Err(); err != nil {
-				return value, err
-			}
+			//if err = client.SetNX(ctx, key, opts.Placeholder, opts.PlaceholderExpiration).Err(); err != nil {
+			//	return value, err
+			//}
 			return value, err
 		}
 
