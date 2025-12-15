@@ -8,7 +8,7 @@ import (
 type UniversalClient interface {
 	redis.UniversalClient
 
-	Fetch(ctx context.Context, key string, fn func(context.Context) ([]byte, error), opts ...FetchOption) (value []byte, err error)
+	Load(ctx context.Context, key string, fn func(context.Context) ([]byte, error), opts ...LoadOption) (value []byte, err error)
 }
 
 type Client struct {
@@ -33,4 +33,12 @@ func NewWithOption(opts *redis.Options) (UniversalClient, error) {
 	}
 
 	return &Client{UniversalClient: rClient}, nil
+}
+
+func NewWithClient(client redis.UniversalClient) (UniversalClient, error) {
+	if _, err := client.Ping(context.Background()).Result(); err != nil {
+		return nil, err
+	}
+
+	return &Client{UniversalClient: client}, nil
 }
