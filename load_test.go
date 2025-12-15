@@ -57,7 +57,7 @@ func TestClient_Load3(t *testing.T) {
 
 	var callCount int64
 	var wg sync.WaitGroup
-	var concurrency = 100
+	var concurrency = 1000
 
 	var successCount int64
 	var failedCount int64
@@ -72,12 +72,11 @@ func TestClient_Load3(t *testing.T) {
 				atomic.AddInt64(&callCount, 1)
 				t.Log("开始加载数据，当前调用次数:", atomic.LoadInt64(&callCount))
 				time.Sleep(time.Millisecond * 200) // 模拟较长的数据加载时间
-				t.Log("-----", time.Now().UnixMilli())
 				return []byte("缓存击穿保护测试数据"), nil
 			},
 				dbr.WithExpiration(time.Second*100),
 				dbr.WithMaxAttempts(5),
-				dbr.WithRetryDelay(time.Millisecond*20),
+				dbr.WithRetryDelay(time.Millisecond*100),
 			)
 
 			if err != nil {
