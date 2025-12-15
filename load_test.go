@@ -10,13 +10,9 @@ import (
 	"time"
 )
 
-type Person struct {
-	Name string
-}
-
-func TestFetch(t *testing.T) {
+func TestClient_Load(t *testing.T) {
 	var rClient, _ = dbr.New("127.0.0.1:6379", "", 1, 2, 2)
-	var value, err = dbr.Load(context.Background(), rClient, "fetch:1", func(ctx context.Context) ([]byte, error) {
+	var value, err = dbr.Load(context.Background(), rClient, "load:1", func(ctx context.Context) ([]byte, error) {
 		t.Log("开始加载数据")
 		time.Sleep(time.Second)
 		t.Log("数据加载完成")
@@ -27,19 +23,19 @@ func TestFetch(t *testing.T) {
 	t.Log(value)
 }
 
-func TestFetch2(t *testing.T) {
+func TestClient_Load2(t *testing.T) {
 	var rClient, _ = dbr.New("127.0.0.1:6379", "", 1, 2, 2)
 
 	var wg sync.WaitGroup
 	for i := 0; i < 1000; i++ {
 		wg.Add(1)
 		go func() {
-			value, err := dbr.Load(context.Background(), rClient, "fetch:2", func(ctx context.Context) ([]byte, error) {
+			value, err := dbr.Load(context.Background(), rClient, "load:2", func(ctx context.Context) ([]byte, error) {
 				t.Log("开始加载数据")
-				time.Sleep(time.Millisecond * 100)
+				time.Sleep(time.Millisecond * 500)
 				t.Log("数据加载完成")
 				return []byte("还是你好！"), nil
-			}, dbr.WithExpiration(time.Second*5))
+			}, dbr.WithExpiration(time.Second*2))
 			if err != nil {
 				t.Log(err)
 			}
@@ -52,13 +48,12 @@ func TestFetch2(t *testing.T) {
 	wg.Wait()
 }
 
-// 测试缓存击穿保护
-func TestCacheBreakdownProtection(t *testing.T) {
+func TestClient_Load3(t *testing.T) {
 	var rClient, _ = dbr.New("127.0.0.1:6379", "", 1, 2, 2)
-	var key = "cache:breakdown:test"
+	var key = "load:3"
 
 	// 先删除可能存在的缓存
-	//rClient.Del(context.Background(), key)
+	rClient.Del(context.Background(), key)
 
 	var callCount int64
 	var wg sync.WaitGroup
