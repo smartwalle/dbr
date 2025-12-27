@@ -81,21 +81,21 @@ var releaseLockScript = redis.NewScript(`
 `)
 
 func Load(ctx context.Context, client redis.UniversalClient, key string, fn func(context.Context) ([]byte, error), opts ...LoadOption) (value []byte, err error) {
-	var fetchOpts = &loadOptions{}
-	fetchOpts.Placeholder = []byte("-")
-	fetchOpts.PlaceholderExpiration = time.Minute * 5
-	fetchOpts.MaxAttempts = 3
-	fetchOpts.RetryDelay = time.Millisecond * 50
-	fetchOpts.LoadTimeout = time.Second * 2
+	var loadOpts = &loadOptions{}
+	loadOpts.Placeholder = []byte("-")
+	loadOpts.PlaceholderExpiration = time.Minute * 5
+	loadOpts.MaxAttempts = 3
+	loadOpts.RetryDelay = time.Millisecond * 50
+	loadOpts.LoadTimeout = time.Second * 2
 	for _, opt := range opts {
 		if opt != nil {
-			opt(fetchOpts)
+			opt(loadOpts)
 		}
 	}
-	if fetchOpts.LoadTimeout < fetchOpts.RetryDelay*time.Duration(fetchOpts.MaxAttempts) {
-		fetchOpts.LoadTimeout += fetchOpts.RetryDelay * time.Duration(fetchOpts.MaxAttempts)
+	if loadOpts.LoadTimeout < loadOpts.RetryDelay*time.Duration(loadOpts.MaxAttempts) {
+		loadOpts.LoadTimeout += loadOpts.RetryDelay * time.Duration(loadOpts.MaxAttempts)
 	}
-	return load(ctx, client, key, fn, fetchOpts)
+	return load(ctx, client, key, fn, loadOpts)
 }
 
 func load(ctx context.Context, client redis.UniversalClient, key string, fn func(context.Context) ([]byte, error), opts *loadOptions) (value []byte, err error) {
