@@ -5,8 +5,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/redis/go-redis/v9"
 	"time"
+
+	"github.com/redis/go-redis/v9"
 )
 
 func (c *Client) Load(ctx context.Context, key string, fn func(context.Context) ([]byte, error), opts ...LoadOption) (value []byte, err error) {
@@ -98,6 +99,21 @@ func Load(ctx context.Context, client redis.UniversalClient, key string, fn func
 	return load(ctx, client, key, fn, loadOpts)
 }
 
+func delay(ctx context.Context, delay time.Duration) error {
+	if delay <= 0 {
+		return nil
+	}
+	var timer = time.NewTimer(delay)
+	defer timer.Stop()
+
+	select {
+	case <-timer.C:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
 func load(ctx context.Context, client redis.UniversalClient, key string, fn func(context.Context) ([]byte, error), opts *loadOptions) (value []byte, err error) {
 	// 从 redis 加载数据
 	// 如果返回了非 redis.Nil 错误，则直接返回
@@ -119,7 +135,7 @@ func load(ctx context.Context, client redis.UniversalClient, key string, fn func
 	// 添加用于从“数据源”获取数据锁
 	var lockKey = fmt.Sprintf("%s:lock", key)
 	var lockValue = uuid()
-	var attempt = 0
+	var attempt = 1
 	var locked = false
 	for {
 		if err = ctx.Err(); err != nil {
@@ -135,16 +151,13 @@ func load(ctx context.Context, client redis.UniversalClient, key string, fn func
 
 		attempt += 1
 		if attempt > opts.MaxAttempts {
+			// 达到最大可尝试次数之后依然没有加锁成功，中止当前循环，执行后续“再次从 redis 加载数据”的逻辑
 			break
 		}
 
 		if opts.RetryDelay > 0 {
-			var timer = time.NewTimer(opts.RetryDelay)
-			select {
-			case <-timer.C:
-			case <-ctx.Done():
-				timer.Stop()
-				return nil, ctx.Err()
+			if err = delay(ctx, opts.RetryDelay); err != nil {
+				return nil, err
 			}
 		}
 	}

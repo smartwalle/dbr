@@ -3,8 +3,9 @@ package redlock
 import (
 	"context"
 	"errors"
-	"github.com/google/uuid"
 	"time"
+
+	"github.com/google/uuid"
 
 	"github.com/redis/go-redis/v9"
 )

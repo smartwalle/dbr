@@ -3,9 +3,10 @@ package tokenbucket
 import (
 	"context"
 	"fmt"
+	"time"
+
 	"github.com/redis/go-redis/v9"
 	"github.com/smartwalle/dbr/tokenbucket/internal"
-	"time"
 )
 
 type Limiter struct {
