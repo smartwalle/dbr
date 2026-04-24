@@ -1,4 +1,4 @@
-package dbr
+package fetch
 
 import (
 	"bytes"
@@ -7,14 +7,11 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
 )
 
-func (c *Client) Load(ctx context.Context, key string, fn func(context.Context) ([]byte, error), opts ...LoadOption) (value []byte, err error) {
-	return Load(ctx, c, key, fn, opts...)
-}
-
-type loadOptions struct {
+type Options struct {
 	Expiration time.Duration
 
 	Placeholder           []byte
@@ -26,28 +23,28 @@ type loadOptions struct {
 	LoadTimeout time.Duration
 }
 
-type LoadOption func(opts *loadOptions)
+type Option func(opts *Options)
 
-func WithExpiration(expiration time.Duration) LoadOption {
-	return func(opts *loadOptions) {
+func WithExpiration(expiration time.Duration) Option {
+	return func(opts *Options) {
 		opts.Expiration = expiration
 	}
 }
 
-func WithPlaceholder(placeholder []byte) LoadOption {
-	return func(opts *loadOptions) {
+func WithPlaceholder(placeholder []byte) Option {
+	return func(opts *Options) {
 		opts.Placeholder = placeholder
 	}
 }
 
-func WithPlaceholderExpiration(expiration time.Duration) LoadOption {
-	return func(opts *loadOptions) {
+func WithPlaceholderExpiration(expiration time.Duration) Option {
+	return func(opts *Options) {
 		opts.PlaceholderExpiration = expiration
 	}
 }
 
-func WithRetryDelay(delay time.Duration) LoadOption {
-	return func(opts *loadOptions) {
+func WithRetryDelay(delay time.Duration) Option {
+	return func(opts *Options) {
 		if delay <= 0 {
 			delay = time.Millisecond * 50
 		}
@@ -55,8 +52,8 @@ func WithRetryDelay(delay time.Duration) LoadOption {
 	}
 }
 
-func WithMaxAttempts(attempts int) LoadOption {
-	return func(opts *loadOptions) {
+func WithMaxAttempts(attempts int) Option {
+	return func(opts *Options) {
 		if attempts <= 0 {
 			attempts = 3
 		}
@@ -64,8 +61,8 @@ func WithMaxAttempts(attempts int) LoadOption {
 	}
 }
 
-func WithLoadTimeout(timeout time.Duration) LoadOption {
-	return func(opts *loadOptions) {
+func WithLoadTimeout(timeout time.Duration) Option {
+	return func(opts *Options) {
 		if timeout <= 0 {
 			timeout = time.Second * 2
 		}
@@ -81,8 +78,8 @@ var releaseLockScript = redis.NewScript(`
 	end
 `)
 
-func Load(ctx context.Context, client redis.UniversalClient, key string, fn func(context.Context) ([]byte, error), opts ...LoadOption) (value []byte, err error) {
-	var loadOpts = &loadOptions{}
+func Do(ctx context.Context, client redis.UniversalClient, key string, fn func(context.Context) ([]byte, error), opts ...Option) (value []byte, err error) {
+	var loadOpts = &Options{}
 	loadOpts.Placeholder = []byte("-")
 	loadOpts.PlaceholderExpiration = time.Minute * 5
 	loadOpts.MaxAttempts = 3
@@ -96,7 +93,7 @@ func Load(ctx context.Context, client redis.UniversalClient, key string, fn func
 	if loadOpts.LoadTimeout < loadOpts.RetryDelay*time.Duration(loadOpts.MaxAttempts) {
 		loadOpts.LoadTimeout += loadOpts.RetryDelay * time.Duration(loadOpts.MaxAttempts)
 	}
-	return load(ctx, client, key, fn, loadOpts)
+	return do(ctx, client, key, fn, loadOpts)
 }
 
 func delay(ctx context.Context, delay time.Duration) error {
@@ -114,7 +111,7 @@ func delay(ctx context.Context, delay time.Duration) error {
 	}
 }
 
-func load(ctx context.Context, client redis.UniversalClient, key string, fn func(context.Context) ([]byte, error), opts *loadOptions) (value []byte, err error) {
+func do(ctx context.Context, client redis.UniversalClient, key string, fn func(context.Context) ([]byte, error), opts *Options) (value []byte, err error) {
 	// 从 redis 加载数据
 	// 如果返回了非 redis.Nil 错误，则直接返回
 	if value, err = client.Get(ctx, key).Bytes(); err != nil && !errors.Is(err, redis.Nil) {
@@ -134,7 +131,7 @@ func load(ctx context.Context, client redis.UniversalClient, key string, fn func
 
 	// 添加用于从“数据源”获取数据锁
 	var lockKey = fmt.Sprintf("%s:lock", key)
-	var lockValue = uuid()
+	var lockValue = uuid.New().String()
 	var attempt = 1
 	var locked = false
 	for {

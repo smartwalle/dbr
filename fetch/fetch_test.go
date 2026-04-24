@@ -1,23 +1,25 @@
-package dbr_test
+package fetch_test
 
 import (
 	"bytes"
 	"context"
-	"github.com/smartwalle/dbr"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/smartwalle/dbr"
+	"github.com/smartwalle/dbr/fetch"
 )
 
 func TestClient_Load(t *testing.T) {
 	var rClient, _ = dbr.New("127.0.0.1:6379", "", 1, 2, 2)
-	var value, err = dbr.Load(context.Background(), rClient, "load:1", func(ctx context.Context) ([]byte, error) {
+	var value, err = fetch.Do(context.Background(), rClient, "do:1", func(ctx context.Context) ([]byte, error) {
 		t.Log("开始加载数据")
 		time.Sleep(time.Second)
 		t.Log("数据加载完成")
 		return []byte("你好!"), nil
-	}, dbr.WithExpiration(time.Second*5))
+	}, fetch.WithExpiration(time.Second*5))
 
 	t.Log(err)
 	t.Log(value)
@@ -30,12 +32,12 @@ func TestClient_Load2(t *testing.T) {
 	for i := 0; i < 1000; i++ {
 		wg.Add(1)
 		go func() {
-			value, err := dbr.Load(context.Background(), rClient, "load:2", func(ctx context.Context) ([]byte, error) {
+			value, err := fetch.Do(context.Background(), rClient, "do:2", func(ctx context.Context) ([]byte, error) {
 				t.Log("开始加载数据")
 				time.Sleep(time.Millisecond * 500)
 				t.Log("数据加载完成")
 				return []byte("还是你好！"), nil
-			}, dbr.WithExpiration(time.Second*2))
+			}, fetch.WithExpiration(time.Second*2))
 			if err != nil {
 				t.Log(err)
 			}
@@ -50,7 +52,7 @@ func TestClient_Load2(t *testing.T) {
 
 func TestClient_Load3(t *testing.T) {
 	var rClient, _ = dbr.New("127.0.0.1:6379", "", 1, 2, 2)
-	var key = "load:3"
+	var key = "do:3"
 
 	// 先删除可能存在的缓存
 	rClient.Del(context.Background(), key)
@@ -67,16 +69,16 @@ func TestClient_Load3(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			value, err := dbr.Load(context.Background(), rClient, key, func(ctx context.Context) ([]byte, error) {
+			value, err := fetch.Do(context.Background(), rClient, key, func(ctx context.Context) ([]byte, error) {
 				// 增加调用计数
 				atomic.AddInt64(&callCount, 1)
 				t.Log("开始加载数据，当前调用次数:", atomic.LoadInt64(&callCount))
 				time.Sleep(time.Millisecond * 200) // 模拟较长的数据加载时间
 				return []byte("缓存击穿保护测试数据"), nil
 			},
-				dbr.WithExpiration(time.Second*100),
-				dbr.WithMaxAttempts(5),
-				dbr.WithRetryDelay(time.Millisecond*100),
+				fetch.WithExpiration(time.Second*100),
+				fetch.WithMaxAttempts(5),
+				fetch.WithRetryDelay(time.Millisecond*100),
 			)
 
 			if err != nil {
