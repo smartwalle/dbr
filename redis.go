@@ -4,13 +4,12 @@ import (
 	"context"
 
 	"github.com/redis/go-redis/v9"
-	"github.com/smartwalle/dbr/fetch"
 )
+
+const Nil = redis.Nil
 
 type UniversalClient interface {
 	redis.UniversalClient
-
-	Fetch(ctx context.Context, key string, fn func(context.Context) ([]byte, error), opts ...fetch.Option) (value []byte, err error)
 }
 
 type Client struct {

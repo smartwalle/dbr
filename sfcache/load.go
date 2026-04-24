@@ -1,4 +1,4 @@
-package fetch
+package sfcache
 
 import (
 	"bytes"
@@ -11,15 +11,26 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
+var ErrHitPlaceholder = errors.New("hit placeholder")
+
 type Options struct {
+	// Expiration 数据在 Redis 中的过期时间。
 	Expiration time.Duration
 
-	Placeholder           []byte
+	// Placeholder 占位符。当缓存未命中时，会先在 Redis 中写入该占位符，
+	// 用于防止缓存穿透。
+	Placeholder []byte
+
+	// PlaceholderExpiration 占位符在 Redis 中的过期时间。
 	PlaceholderExpiration time.Duration
 
+	// MaxAttempts 获取分布式锁的最大尝试次数。
 	MaxAttempts int
-	RetryDelay  time.Duration
 
+	// RetryDelay 获取锁失败后的重试间隔。
+	RetryDelay time.Duration
+
+	// LoadTimeout 加载超时时间，同时也用作分布式锁的租约时间。
 	LoadTimeout time.Duration
 }
 
@@ -78,7 +89,14 @@ var releaseLockScript = redis.NewScript(`
 	end
 `)
 
-func Do(ctx context.Context, client redis.UniversalClient, key string, fn func(context.Context) ([]byte, error), opts ...Option) (value []byte, err error) {
+// Load 从 Redis 缓存中加载数据，如果缓存未命中，则通过 fn 函数从数据源获取数据并写入缓存。
+//
+// 该函数具有以下特性：
+//  1. Single-Flight (并发抑制): 当多个请求同时加载同一个缺失的 key 时，只有一个请求会执行 fn 函数，
+//     其他请求会等待并尝试从缓存中获取第一个请求加载的结果，从而防止缓存击穿。
+//  2. 占位符机制: 支持写入占位符以防止缓存穿透。如果 fn 执行较慢，先占位的机制也能让后续请求感知到正在加载中。
+//  3. 重试与超时: 在等待锁的过程中支持配置重试次数和延迟。
+func Load(ctx context.Context, client redis.UniversalClient, key string, fn func(context.Context) ([]byte, error), opts ...Option) (value []byte, err error) {
 	var loadOpts = &Options{}
 	loadOpts.Placeholder = []byte("-")
 	loadOpts.PlaceholderExpiration = time.Minute * 5
@@ -93,7 +111,7 @@ func Do(ctx context.Context, client redis.UniversalClient, key string, fn func(c
 	if loadOpts.LoadTimeout < loadOpts.RetryDelay*time.Duration(loadOpts.MaxAttempts) {
 		loadOpts.LoadTimeout += loadOpts.RetryDelay * time.Duration(loadOpts.MaxAttempts)
 	}
-	return do(ctx, client, key, fn, loadOpts)
+	return load(ctx, client, key, fn, loadOpts)
 }
 
 func delay(ctx context.Context, delay time.Duration) error {
@@ -111,7 +129,8 @@ func delay(ctx context.Context, delay time.Duration) error {
 	}
 }
 
-func do(ctx context.Context, client redis.UniversalClient, key string, fn func(context.Context) ([]byte, error), opts *Options) (value []byte, err error) {
+// load 是 Load 函数的内部实现，包含了核心的缓存加载逻辑。
+func load(ctx context.Context, client redis.UniversalClient, key string, fn func(context.Context) ([]byte, error), opts *Options) (value []byte, err error) {
 	// 从 redis 加载数据
 	// 如果返回了非 redis.Nil 错误，则直接返回
 	if value, err = client.Get(ctx, key).Bytes(); err != nil && !errors.Is(err, redis.Nil) {
@@ -121,10 +140,12 @@ func do(ctx context.Context, client redis.UniversalClient, key string, fn func(c
 	if err == nil {
 		// 检查是否为加载中的占位符
 		if len(value) > 0 && len(opts.Placeholder) > 0 && bytes.Equal(value, opts.Placeholder) {
-			return nil, redis.Nil
+			// 如果是占位符，不直接返回，继续往下执行，通过“加锁”环节进行等待
+			// return value, ErrHitPlaceholder
+		} else {
+			// 返回数据
+			return value, nil
 		}
-		// 返回数据
-		return value, nil
 	}
 
 	// 当 err 为 redis.Nil 时，表示在 redis 中不存在该 key，所以继续往下执行
@@ -159,7 +180,14 @@ func do(ctx context.Context, client redis.UniversalClient, key string, fn func(c
 		}
 	}
 
+	// 此 context 仅用于 fn 中，其它 redis 相关的操作正常使用 ctx
+	var loadCtx = ctx
+
 	if locked {
+		var loadCancel func()
+		loadCtx, loadCancel = context.WithTimeout(ctx, opts.LoadTimeout)
+		defer loadCancel()
+
 		// 使用 Lua 脚本原子性释放锁
 		defer func() {
 			releaseLockScript.Run(ctx, client, []string{lockKey}, lockValue)
@@ -173,9 +201,9 @@ func do(ctx context.Context, client redis.UniversalClient, key string, fn func(c
 	}
 	// 如果 err 为 nil，表示 key 在 redis 中已经存在
 	if err == nil {
-		// 检查是否为加载中的占位符
+		// 检查是否为占位符
 		if len(value) > 0 && len(opts.Placeholder) > 0 && bytes.Equal(value, opts.Placeholder) {
-			return nil, redis.Nil
+			return value, ErrHitPlaceholder
 		}
 		// 返回数据
 		return value, nil
@@ -191,11 +219,7 @@ func do(ctx context.Context, client redis.UniversalClient, key string, fn func(c
 		}
 
 		// 从“数据源”读取数据
-		if value, err = fn(ctx); err != nil {
-			// 从“数据源”读取数据返回 err，写入“占位符”
-			//if err = client.SetNX(ctx, key, opts.Placeholder, opts.PlaceholderExpiration).Err(); err != nil {
-			//	return value, err
-			//}
+		if value, err = fn(loadCtx); err != nil {
 			return value, err
 		}
 

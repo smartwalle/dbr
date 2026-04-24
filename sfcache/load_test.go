@@ -1,28 +1,29 @@
-package fetch_test
+package sfcache_test
 
 import (
 	"bytes"
 	"context"
+	"errors"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/smartwalle/dbr"
-	"github.com/smartwalle/dbr/fetch"
+	"github.com/smartwalle/dbr/sfcache"
 )
 
 func TestClient_Load(t *testing.T) {
 	var rClient, _ = dbr.New("127.0.0.1:6379", "", 1, 2, 2)
-	var value, err = fetch.Do(context.Background(), rClient, "do:1", func(ctx context.Context) ([]byte, error) {
+	var value, err = sfcache.Load(context.Background(), rClient, "load:1", func(ctx context.Context) ([]byte, error) {
 		t.Log("开始加载数据")
 		time.Sleep(time.Second)
 		t.Log("数据加载完成")
 		return []byte("你好!"), nil
-	}, fetch.WithExpiration(time.Second*5))
+	}, sfcache.WithExpiration(time.Second*5))
 
 	t.Log(err)
-	t.Log(value)
+	t.Log(string(value))
 }
 
 func TestClient_Load2(t *testing.T) {
@@ -32,17 +33,17 @@ func TestClient_Load2(t *testing.T) {
 	for i := 0; i < 1000; i++ {
 		wg.Add(1)
 		go func() {
-			value, err := fetch.Do(context.Background(), rClient, "do:2", func(ctx context.Context) ([]byte, error) {
+			value, err := sfcache.Load(context.Background(), rClient, "load:2", func(ctx context.Context) ([]byte, error) {
 				t.Log("开始加载数据")
-				time.Sleep(time.Millisecond * 500)
+				time.Sleep(time.Millisecond * 140)
 				t.Log("数据加载完成")
 				return []byte("还是你好！"), nil
-			}, fetch.WithExpiration(time.Second*2))
+			}, sfcache.WithExpiration(time.Second*2))
 			if err != nil {
-				t.Log(err)
+				t.Log(i, err)
 			}
 			if !bytes.Equal(value, []byte("还是你好！")) {
-				t.Log(value)
+				t.Log(i, value)
 			}
 			wg.Done()
 		}()
@@ -52,7 +53,7 @@ func TestClient_Load2(t *testing.T) {
 
 func TestClient_Load3(t *testing.T) {
 	var rClient, _ = dbr.New("127.0.0.1:6379", "", 1, 2, 2)
-	var key = "do:3"
+	var key = "load:3"
 
 	// 先删除可能存在的缓存
 	rClient.Del(context.Background(), key)
@@ -69,16 +70,16 @@ func TestClient_Load3(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			value, err := fetch.Do(context.Background(), rClient, key, func(ctx context.Context) ([]byte, error) {
+			value, err := sfcache.Load(context.Background(), rClient, key, func(ctx context.Context) ([]byte, error) {
 				// 增加调用计数
 				atomic.AddInt64(&callCount, 1)
 				t.Log("开始加载数据，当前调用次数:", atomic.LoadInt64(&callCount))
 				time.Sleep(time.Millisecond * 200) // 模拟较长的数据加载时间
 				return []byte("缓存击穿保护测试数据"), nil
 			},
-				fetch.WithExpiration(time.Second*100),
-				fetch.WithMaxAttempts(5),
-				fetch.WithRetryDelay(time.Millisecond*100),
+				sfcache.WithExpiration(time.Second*100),
+				sfcache.WithMaxAttempts(5),
+				sfcache.WithRetryDelay(time.Millisecond*100),
 			)
 
 			if err != nil {
@@ -105,4 +106,49 @@ func TestClient_Load3(t *testing.T) {
 	}
 
 	t.Log(failedCount, successCount)
+}
+
+func TestClient_LoadNegativeCache(t *testing.T) {
+	var rClient, err = dbr.New("127.0.0.1:6379", "", 1, 2, 2)
+	if err != nil {
+		t.Skip("Redis 不可用，跳过测试:", err)
+	}
+
+	var key = "load:negative"
+	rClient.Del(context.Background(), key)
+
+	// 1. 模拟加载失败
+	_, err = sfcache.Load(context.Background(), rClient, key, func(ctx context.Context) ([]byte, error) {
+		t.Log("第一次加载数据")
+		return nil, errors.New("读取数据异常") // 模拟加载失败
+	}, sfcache.WithPlaceholderExpiration(time.Second*2))
+
+	if err == nil {
+		t.Fatal("期望加载失败，但成功了")
+	}
+
+	// 2. 立即再次尝试，应该命中“负面缓存”占位符，返回 redis.Nil
+	_, err = sfcache.Load(context.Background(), rClient, key, func(ctx context.Context) ([]byte, error) {
+		t.Fatal("不应该调用 fn，因为应该命中负面缓存")
+		return nil, nil
+	})
+
+	if !errors.Is(err, sfcache.ErrHitPlaceholder) {
+		t.Errorf("期望返回 sfcache.ErrHitPlaceholder (负面缓存)，实际返回: %v", err)
+	}
+
+	// 3. 等待占位符过期
+	time.Sleep(time.Second * 3)
+
+	// 4. 再次尝试，占位符已过期，应该重新调用 fn
+	var called = false
+	_, err = sfcache.Load(context.Background(), rClient, key, func(ctx context.Context) ([]byte, error) {
+		called = true
+		t.Log("第二次加载数据")
+		return []byte("ok"), nil
+	})
+
+	if !called {
+		t.Error("占位符过期后，应该重新调用 fn")
+	}
 }
