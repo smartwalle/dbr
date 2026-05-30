@@ -1,4 +1,4 @@
-package redlock
+package redislock
 
 import (
 	"context"
@@ -15,18 +15,17 @@ var (
 	ErrLockNotHeld = errors.New("lock not held")
 )
 
-// Mutex 分布式互斥锁
-type Mutex struct {
-	client       redis.UniversalClient
-	key          string
-	token        string
-	options      *Options
-	acquiredTime time.Time // 获得锁时间
+// Lock 分布式锁
+type Lock struct {
+	client  redis.UniversalClient
+	key     string
+	token   string
+	options *Options
 }
 
 // Options 分布式锁选项
 type Options struct {
-	// Duration 锁的持续时间
+	// Duration 锁的最大持续时间
 	Duration time.Duration
 
 	// Timeout 获取锁超时时间，超过此时间后不再重试并返回错误，小于等于0则表示不会进行等待
@@ -39,10 +38,12 @@ type Options struct {
 // Option 分布式锁选项函数
 type Option func(*Options)
 
-// WithDuration 设置锁持续时间
+// WithDuration 设置锁最大持续时间
 func WithDuration(duration time.Duration) Option {
 	return func(opts *Options) {
-		opts.Duration = duration
+		if duration > 0 {
+			opts.Duration = duration
+		}
 	}
 }
 
@@ -65,14 +66,14 @@ func WithTimeout(timeout time.Duration) Option {
 // defaultOptions 默认选项
 func defaultOptions() *Options {
 	return &Options{
-		Duration:   2 * time.Second,        // 默认持续时间2秒
+		Duration:   2 * time.Second,        // 默认最大持续时间2秒
 		Timeout:    5 * time.Second,        // 默认最大等待5秒
 		RetryDelay: 100 * time.Millisecond, // 默认重试延迟100毫秒
 	}
 }
 
 // New 创建分布式锁
-func New(client redis.UniversalClient, key string, opts ...Option) *Mutex {
+func New(client redis.UniversalClient, key string, opts ...Option) *Lock {
 	var options = defaultOptions()
 	for _, opt := range opts {
 		if opt != nil {
@@ -80,15 +81,16 @@ func New(client redis.UniversalClient, key string, opts ...Option) *Mutex {
 		}
 	}
 
-	return &Mutex{
+	return &Lock{
 		client:  client,
 		key:     key,
+		token:   uuid.New().String(),
 		options: options,
 	}
 }
 
 // Lock 获取锁，直到成功或上下文取消
-func (m *Mutex) Lock(ctx context.Context) (err error) {
+func (m *Lock) Lock(ctx context.Context) (err error) {
 	// 没有设置“获取锁超时时间”，则只尝试一次
 	if m.options.Timeout <= 0 {
 		return m.TryLock(ctx)
@@ -100,6 +102,9 @@ func (m *Mutex) Lock(ctx context.Context) (err error) {
 	for {
 		select {
 		case <-acquireCtx.Done():
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
 			return ErrLockFailed
 		default:
 			if err = m.TryLock(acquireCtx); err == nil {
@@ -128,22 +133,19 @@ func Sleep(ctx context.Context, duration time.Duration) error {
 }
 
 // TryLock 尝试获取锁，会立即返回结果
-func (m *Mutex) TryLock(ctx context.Context) error {
-	var token = uuid.New().String()
-	acquired, err := acquireLock(ctx, m.client, m.key, token, m.options.Duration)
+func (m *Lock) TryLock(ctx context.Context) error {
+	acquired, err := acquireLock(ctx, m.client, m.key, m.token, m.options.Duration)
 	if err != nil {
 		return err
 	}
 	if !acquired {
 		return ErrLockFailed
 	}
-	m.token = token
-	m.acquiredTime = time.Now()
 	return nil
 }
 
 // Unlock 释放锁
-func (m *Mutex) Unlock(ctx context.Context) error {
+func (m *Lock) Unlock(ctx context.Context) error {
 	success, err := releaseLock(ctx, m.client, m.key, m.token)
 	if err != nil {
 		return err
@@ -155,7 +157,7 @@ func (m *Mutex) Unlock(ctx context.Context) error {
 }
 
 // Extend 续约锁
-func (m *Mutex) extend(ctx context.Context) error {
+func (m *Lock) Extend(ctx context.Context) error {
 	success, err := extendLock(ctx, m.client, m.key, m.token, m.options.Duration)
 	if err != nil {
 		return err
@@ -186,8 +188,7 @@ var (
 
 	extendScript = redis.NewScript(`
 		if redis.call("GET", KEYS[1]) == ARGV[1] then
-			redis.call("PEXPIRE", KEYS[1], ARGV[2])
-			return 1
+			return redis.call("PEXPIRE", KEYS[1], ARGV[2])
 		else
 			return 0
 		end
@@ -205,7 +206,7 @@ func acquireLock(ctx context.Context, client redis.UniversalClient, key, token s
 
 // releaseLock 释放锁
 func releaseLock(ctx context.Context, client redis.UniversalClient, key, token string) (bool, error) {
-	result, err := releaseScript.Run(ctx, client, []string{key}, token).Int()
+	result, err := releaseScript.Run(context.WithoutCancel(ctx), client, []string{key}, token).Int()
 	if err != nil {
 		return false, err
 	}
