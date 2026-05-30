@@ -114,21 +114,6 @@ func Load(ctx context.Context, client redis.UniversalClient, key string, fn func
 	return load(ctx, client, key, fn, loadOpts)
 }
 
-func delay(ctx context.Context, delay time.Duration) error {
-	if delay <= 0 {
-		return nil
-	}
-	var timer = time.NewTimer(delay)
-	defer timer.Stop()
-
-	select {
-	case <-timer.C:
-		return nil
-	case <-ctx.Done():
-		return ctx.Err()
-	}
-}
-
 // load 是 Load 函数的内部实现，包含了核心的缓存加载逻辑。
 func load(ctx context.Context, client redis.UniversalClient, key string, fn func(context.Context) ([]byte, error), opts *Options) (value []byte, err error) {
 	// 从 redis 加载数据
@@ -155,6 +140,12 @@ func load(ctx context.Context, client redis.UniversalClient, key string, fn func
 	var lockValue = uuid.New().String()
 	var attempt = 1
 	var locked = false
+	var ticker *time.Ticker
+	defer func() {
+		if ticker != nil {
+			ticker.Stop()
+		}
+	}()
 	for {
 		if err = ctx.Err(); err != nil {
 			return nil, err
@@ -174,8 +165,17 @@ func load(ctx context.Context, client redis.UniversalClient, key string, fn func
 		}
 
 		if opts.RetryDelay > 0 {
-			if err = delay(ctx, opts.RetryDelay); err != nil {
+			if ticker == nil {
+				ticker = time.NewTicker(opts.RetryDelay)
+			} else {
+				ticker.Reset(opts.RetryDelay)
+			}
+
+			select {
+			case <-ctx.Done():
 				return nil, err
+			case <-ticker.C:
+				continue
 			}
 		}
 	}
