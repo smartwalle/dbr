@@ -81,7 +81,7 @@ func WithLoadTimeout(timeout time.Duration) Option {
 	}
 }
 
-var releaseLockScript = redis.NewScript(`
+var releaseScript = redis.NewScript(`
 	if redis.call("GET", KEYS[1]) == ARGV[1] then
 		return redis.call("DEL", KEYS[1])
 	else
@@ -190,7 +190,7 @@ func load(ctx context.Context, client redis.UniversalClient, key string, fn func
 
 		// 使用 Lua 脚本原子性释放锁
 		defer func() {
-			releaseLockScript.Run(ctx, client, []string{lockKey}, lockValue)
+			releaseScript.Run(ctx, client, []string{lockKey}, lockValue)
 		}()
 	}
 
