@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -136,7 +136,7 @@ func load(ctx context.Context, client redis.UniversalClient, key string, fn func
 	// 当 err 为 redis.Nil 时，表示在 redis 中不存在该 key，所以继续往下执行
 
 	// 添加用于从“数据源”获取数据锁
-	var lockKey = fmt.Sprintf("%s:lock", key)
+	var lockKey = strings.Join([]string{key, "lock"}, ":")
 	var lockValue = uuid.New().String()
 	var attempt = 1
 	var locked = false
