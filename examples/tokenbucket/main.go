@@ -16,7 +16,7 @@ func main() {
 
 	var rClient = redis.NewClient(opt)
 
-	var limiter = tokenbucket.New(rClient, 10, 1)
+	var limiter = tokenbucket.New(rClient, "dbr:tokenbucket", 10, 1)
 
 	for i := 0; i < 11; i++ {
 		fmt.Println(limiter.Allow(context.Background(), "tb"))
