@@ -11,37 +11,37 @@ import (
 type Limiter struct {
 	client redis.UniversalClient
 
-	key      string
-	capacity int // 令牌桶容量
-	rate     int // 每秒生成令牌数量
+	name     string // 令牌桶名称
+	capacity int    // 令牌桶容量
+	rate     int    // 每秒生成令牌数量
 }
 
-func New(client redis.UniversalClient, key string, capacity, rate int) *Limiter {
+func New(client redis.UniversalClient, name string, capacity, rate int) *Limiter {
 	var limiter = &Limiter{}
 	limiter.client = client
-	limiter.key = key
+	limiter.name = name
 	limiter.capacity = capacity
 	limiter.rate = rate
 	return limiter
 }
 
-func (limiter *Limiter) Allow(ctx context.Context, paths ...string) bool {
-	var fullpath = make([]string, 1, len(paths)+1)
-	fullpath[0] = limiter.key
-	if len(paths) > 0 {
-		fullpath = append(fullpath, paths...)
+func (limiter *Limiter) Allow(ctx context.Context, keys ...string) bool {
+	var paths = make([]string, 1, len(keys)+1)
+	paths[0] = limiter.name
+	if len(keys) > 0 {
+		paths = append(paths, keys...)
 	}
 
-	var keys = []string{
-		strings.Join(fullpath, ":"),
+	var scriptKeys = []string{
+		strings.Join(paths, ":"),
 	}
-	var args = []interface{}{
+	var scriptArgs = []interface{}{
 		time.Now().Unix(),
 		limiter.capacity,
 		limiter.rate,
 		1,
 	}
-	value, err := acquireScript.Run(ctx, limiter.client, keys, args...).Bool()
+	value, err := acquireScript.Run(ctx, limiter.client, scriptKeys, scriptArgs...).Bool()
 	if err != nil {
 		return false
 	}
