@@ -187,7 +187,7 @@ func load(ctx context.Context, client redis.UniversalClient, key string, fn func
 
 		// 使用 Lua 脚本原子性释放锁
 		defer func() {
-			releaseCtx, releaseCancel := context.WithTimeout(context.WithoutCancel(ctx), time.Second)
+			releaseCtx, releaseCancel := context.WithTimeout(context.WithoutCancel(ctx), time.Second*2)
 			defer releaseCancel()
 			_ = releaseScript.Run(releaseCtx, client, []string{lockKey}, lockValue).Err()
 		}()

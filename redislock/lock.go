@@ -211,7 +211,10 @@ func acquireLock(ctx context.Context, client redis.UniversalClient, key, token s
 
 // releaseLock 释放锁
 func releaseLock(ctx context.Context, client redis.UniversalClient, key, token string) (bool, error) {
-	result, err := releaseScript.Run(context.WithoutCancel(ctx), client, []string{key}, token).Int()
+	releaseCtx, releaseCancel := context.WithTimeout(context.WithoutCancel(ctx), time.Second*2)
+	defer releaseCancel()
+
+	result, err := releaseScript.Run(releaseCtx, client, []string{key}, token).Int()
 	if err != nil {
 		return false, err
 	}
