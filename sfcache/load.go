@@ -108,9 +108,6 @@ func Load(ctx context.Context, client redis.UniversalClient, key string, fn func
 			opt(loadOpts)
 		}
 	}
-	if loadOpts.LoadTimeout < loadOpts.RetryDelay*time.Duration(loadOpts.MaxAttempts) {
-		loadOpts.LoadTimeout += loadOpts.RetryDelay * time.Duration(loadOpts.MaxAttempts)
-	}
 	return load(ctx, client, key, fn, loadOpts)
 }
 
@@ -173,7 +170,7 @@ func load(ctx context.Context, client redis.UniversalClient, key string, fn func
 
 			select {
 			case <-ctx.Done():
-				return nil, err
+				return nil, ctx.Err()
 			case <-ticker.C:
 				continue
 			}
@@ -190,7 +187,9 @@ func load(ctx context.Context, client redis.UniversalClient, key string, fn func
 
 		// 使用 Lua 脚本原子性释放锁
 		defer func() {
-			releaseScript.Run(ctx, client, []string{lockKey}, lockValue)
+			releaseCtx, releaseCancel := context.WithTimeout(context.WithoutCancel(ctx), time.Second)
+			defer releaseCancel()
+			_ = releaseScript.Run(releaseCtx, client, []string{lockKey}, lockValue).Err()
 		}()
 	}
 
@@ -214,13 +213,29 @@ func load(ctx context.Context, client redis.UniversalClient, key string, fn func
 	// 添加用于从“数据源”获取数据锁成功
 	if locked {
 		// 写入“占位符”
-		if err = client.SetNX(ctx, key, opts.Placeholder, opts.PlaceholderExpiration).Err(); err != nil {
+		var writePlaceholder bool
+		if writePlaceholder, err = client.SetNX(ctx, key, opts.Placeholder, opts.PlaceholderExpiration).Result(); err != nil {
 			return value, err
+		}
+		if !writePlaceholder {
+			if value, err = client.Get(ctx, key).Bytes(); err != nil {
+				return value, err
+			}
+			if len(value) > 0 && len(opts.Placeholder) > 0 && bytes.Equal(value, opts.Placeholder) {
+				return value, ErrHitPlaceholder
+			}
+			return value, nil
 		}
 
 		// 从“数据源”读取数据
 		if value, err = fn(loadCtx); err != nil {
 			return value, err
+		}
+
+		// fn 可能不监听 context，导致超时后才返回。
+		// 这种结果不能再写入缓存，否则可能覆盖后续 loader 写入的新值。
+		if err = loadCtx.Err(); err != nil {
+			return nil, err
 		}
 
 		// 从“数据源”读取数据成功，将数据写入缓存
