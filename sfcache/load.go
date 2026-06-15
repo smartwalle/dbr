@@ -137,12 +137,7 @@ func load(ctx context.Context, client redis.UniversalClient, key string, fn func
 	var lockValue = uuid.New().String()
 	var attempt = 1
 	var locked = false
-	var ticker *time.Ticker
-	defer func() {
-		if ticker != nil {
-			ticker.Stop()
-		}
-	}()
+	var timer *time.Timer
 	for {
 		if err = ctx.Err(); err != nil {
 			return nil, err
@@ -161,19 +156,23 @@ func load(ctx context.Context, client redis.UniversalClient, key string, fn func
 			break
 		}
 
-		if opts.RetryDelay > 0 {
-			if ticker == nil {
-				ticker = time.NewTicker(opts.RetryDelay)
-			} else {
-				ticker.Reset(opts.RetryDelay)
-			}
+		if timer == nil {
+			timer = time.NewTimer(opts.RetryDelay)
+		} else {
+			timer.Reset(opts.RetryDelay)
+		}
 
-			select {
-			case <-ctx.Done():
-				return nil, ctx.Err()
-			case <-ticker.C:
-				continue
+		select {
+		case <-ctx.Done():
+			if !timer.Stop() {
+				select {
+				case <-timer.C:
+				default:
+				}
 			}
+			return nil, ctx.Err()
+		case <-timer.C:
+			continue
 		}
 	}
 

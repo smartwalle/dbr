@@ -45,21 +45,20 @@ type Option func(*Options)
 // WithDuration 设置锁最大持续时间
 func WithDuration(duration time.Duration) Option {
 	return func(opts *Options) {
-		if duration > 0 {
-			if duration < time.Millisecond {
-				duration = time.Millisecond * 10
-			}
-			opts.Duration = duration
+		if duration < time.Millisecond {
+			duration = time.Millisecond * 100
 		}
+		opts.Duration = duration
 	}
 }
 
 // WithRetryDelay 设置重试间隔
 func WithRetryDelay(delay time.Duration) Option {
 	return func(opts *Options) {
-		if delay > 0 {
-			opts.RetryDelay = delay
+		if delay <= 0 {
+			delay = time.Millisecond * 50
 		}
+		opts.RetryDelay = delay
 	}
 }
 
