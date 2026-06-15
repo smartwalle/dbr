@@ -18,7 +18,7 @@ type Options struct {
 	Expiration time.Duration
 
 	// Placeholder 占位符。当缓存未命中时，会先在 Redis 中写入该占位符，
-	// 用于防止缓存穿透。
+	// 用于防止缓存穿透。该值必须选择不会和真实缓存值冲突的字节序列。
 	Placeholder []byte
 
 	// PlaceholderExpiration 占位符在 Redis 中的过期时间。
