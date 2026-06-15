@@ -42,6 +42,9 @@ type Option func(*Options)
 func WithDuration(duration time.Duration) Option {
 	return func(opts *Options) {
 		if duration > 0 {
+			if duration < time.Millisecond {
+				duration = time.Millisecond * 10
+			}
 			opts.Duration = duration
 		}
 	}
@@ -129,7 +132,10 @@ func (m *Lock) Lock(ctx context.Context) (err error) {
 
 			select {
 			case <-acquireCtx.Done():
-				return acquireCtx.Err()
+				if ctx.Err() != nil {
+					return ctx.Err()
+				}
+				return ErrLockFailed
 			case <-ticker.C:
 				continue
 			}
