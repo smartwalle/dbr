@@ -105,12 +105,7 @@ func (m *Lock) Lock(ctx context.Context) (err error) {
 	var acquireCtx, acquireCancel = context.WithTimeout(ctx, m.options.Timeout)
 	defer acquireCancel()
 
-	var ticker *time.Ticker
-	defer func() {
-		if ticker != nil {
-			ticker.Stop()
-		}
-	}()
+	var timer *time.Timer
 
 	for {
 		select {
@@ -127,20 +122,26 @@ func (m *Lock) Lock(ctx context.Context) (err error) {
 				return err
 			}
 
-			if ticker == nil {
-				ticker = time.NewTicker(m.options.RetryDelay)
+			if timer == nil {
+				timer = time.NewTimer(m.options.RetryDelay)
 			} else {
-				ticker.Reset(m.options.RetryDelay)
+				timer.Reset(m.options.RetryDelay)
 			}
 
 			select {
+			case <-timer.C:
+				continue
 			case <-acquireCtx.Done():
+				if !timer.Stop() {
+					select {
+					case <-timer.C:
+					default:
+					}
+				}
 				if ctx.Err() != nil {
 					return ctx.Err()
 				}
 				return ErrLockFailed
-			case <-ticker.C:
-				continue
 			}
 		}
 	}
