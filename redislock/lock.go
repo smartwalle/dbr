@@ -3,6 +3,7 @@ package redislock
 import (
 	"context"
 	"errors"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -11,15 +12,18 @@ import (
 )
 
 var (
-	ErrLockFailed  = errors.New("failed to acquire lock")
-	ErrLockNotHeld = errors.New("lock not held")
+	ErrLockFailed      = errors.New("failed to acquire lock")
+	ErrLockNotHeld     = errors.New("lock not held")
+	ErrLockAlreadyHeld = errors.New("lock already held")
 )
 
 // Lock 分布式锁
 type Lock struct {
 	client  redis.UniversalClient
 	key     string
+	mu      sync.Mutex
 	token   string
+	locked  bool
 	options *Options
 }
 
@@ -87,7 +91,6 @@ func New(client redis.UniversalClient, key string, opts ...Option) *Lock {
 	return &Lock{
 		client:  client,
 		key:     key,
-		token:   uuid.New().String(),
 		options: options,
 	}
 }
@@ -145,22 +148,42 @@ func (m *Lock) Lock(ctx context.Context) (err error) {
 
 // TryLock 尝试获取锁，会立即返回结果
 func (m *Lock) TryLock(ctx context.Context) error {
-	acquired, err := acquireLock(ctx, m.client, m.key, m.token, m.options.Duration)
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if m.locked {
+		return ErrLockAlreadyHeld
+	}
+
+	var token = uuid.New().String()
+	acquired, err := acquireLock(ctx, m.client, m.key, token, m.options.Duration)
 	if err != nil {
 		return err
 	}
 	if !acquired {
 		return ErrLockFailed
 	}
+	m.token = token
+	m.locked = true
 	return nil
 }
 
 // Unlock 释放锁
 func (m *Lock) Unlock(ctx context.Context) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if !m.locked {
+		return ErrLockNotHeld
+	}
+
 	success, err := releaseLock(ctx, m.client, m.key, m.token)
 	if err != nil {
 		return err
 	}
+	m.token = ""
+	m.locked = false
+
 	if !success {
 		return ErrLockNotHeld
 	}
@@ -169,11 +192,20 @@ func (m *Lock) Unlock(ctx context.Context) error {
 
 // Extend 续约锁
 func (m *Lock) Extend(ctx context.Context) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if !m.locked {
+		return ErrLockNotHeld
+	}
+
 	success, err := extendLock(ctx, m.client, m.key, m.token, m.options.Duration)
 	if err != nil {
 		return err
 	}
 	if !success {
+		m.token = ""
+		m.locked = false
 		return ErrLockNotHeld
 	}
 	return nil
