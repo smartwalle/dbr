@@ -274,3 +274,46 @@ func TestClient_LoadTimeoutNotFoundDoesNotWriteEmptyCache(t *testing.T) {
 		t.Fatalf("数据不匹配，期望: ok，实际: %s", string(value))
 	}
 }
+
+func TestClient_LoadStaleResultReturnsLatestCache(t *testing.T) {
+	var rClient = newTestClient(t)
+	var key = "load:stale-result"
+	cleanKeys(context.Background(), rClient, key)
+
+	firstStarted := make(chan struct{})
+	allowFirstReturn := make(chan struct{})
+
+	var wg sync.WaitGroup
+	var firstValue []byte
+	var firstErr error
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		firstValue, firstErr = sfcache.Load(context.Background(), rClient, key, func(ctx context.Context) ([]byte, error) {
+			close(firstStarted)
+			<-allowFirstReturn
+			return []byte("first"), nil
+		},
+			sfcache.WithExpiration(time.Second*5),
+			sfcache.WithLoadTimeout(time.Second),
+		)
+	}()
+
+	<-firstStarted
+	if err := rClient.Set(context.Background(), key, []byte("second"), time.Second*5).Err(); err != nil {
+		t.Fatal(err)
+	}
+	if err := rClient.Del(context.Background(), key+":lock").Err(); err != nil {
+		t.Fatal(err)
+	}
+
+	close(allowFirstReturn)
+	wg.Wait()
+
+	if firstErr != nil {
+		t.Fatal(firstErr)
+	}
+	if !bytes.Equal(firstValue, []byte("second")) {
+		t.Fatalf("过时加载应返回最新缓存，期望: second，实际: %s", string(firstValue))
+	}
+}

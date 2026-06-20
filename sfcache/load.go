@@ -343,6 +343,10 @@ func loadLocked(ctx context.Context, client redis.UniversalClient, key string, e
 		if errors.Is(err, ErrNotFound) {
 			// 只有明确不存在才写负面缓存；临时错误直接返回，避免把故障缓存成空结果。
 			if err = setEmpty(ctx, client, key, emptyKey, lockKey, lockValue, opts.EmptyExpiration, opts.WriteTimeout); err != nil {
+				// 如果本次空结果已经过时，优先尝试返回其它加载者写入的最新缓存结果。
+				if value, err = getStaleResult(ctx, client, key, emptyKey, err); err == nil {
+					return value, nil
+				}
 				return nil, err
 			}
 			return nil, ErrNotFound
@@ -363,9 +367,30 @@ func loadLocked(ctx context.Context, client redis.UniversalClient, key string, e
 
 	// 成功加载后写真实缓存，并清理可能存在的 emptyKey，避免旧负面缓存继续生效。
 	if err = setValue(ctx, client, key, emptyKey, lockKey, lockValue, value, opts.Expiration, opts.WriteTimeout); err != nil {
+		// 如果本次真实结果已经过时，优先尝试返回其它加载者写入的最新缓存结果。
+		if value, err = getStaleResult(ctx, client, key, emptyKey, err); err == nil {
+			return value, nil
+		}
 		return value, err
 	}
 	return value, nil
+}
+
+// getStaleResult 只处理 ErrStaleResult：当前加载结果不能写入时，尝试读取其它加载者已经写入的最新结果。
+// 正常写入路径不会调用该函数；stale 路径最多额外执行一次 GET，以及未命中时一次 EXISTS。
+func getStaleResult(ctx context.Context, client redis.UniversalClient, key string, emptyKey string, err error) ([]byte, error) {
+	if !errors.Is(err, ErrStaleResult) {
+		return nil, err
+	}
+
+	value, found, loadErr := getCached(ctx, client, key, emptyKey)
+	if loadErr != nil {
+		return nil, loadErr
+	}
+	if found {
+		return value, nil
+	}
+	return nil, ErrStaleResult
 }
 
 // setValue 在确认当前加载结果仍有效后写入真实缓存，并删除 emptyKey。
