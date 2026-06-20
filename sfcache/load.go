@@ -29,6 +29,12 @@ const (
 )
 
 // Options 定义 Load 的缓存、等待和超时策略。
+//
+// 常见配置参考：
+//  1. 快速数据源：LoadTimeout=500ms, WriteTimeout=200ms, RetryDelay=20ms。
+//  2. 普通业务查询：使用默认值，LoadTimeout=2s, WriteTimeout=1s, RetryDelay=50ms。
+//  3. 慢数据源：适当增大 LoadTimeout，例如 5s；LockTimeout 会自动提升到 LoadTimeout+WriteTimeout。
+//  4. 高并发热点 key：适当增大 WaitTimeout，让等待者更倾向于等到首个加载结果，而不是提前超时。
 type Options struct {
 	// Expiration 真实数据在 Redis 中的过期时间。零值表示不过期。
 	Expiration time.Duration
