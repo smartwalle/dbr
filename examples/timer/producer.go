@@ -24,8 +24,12 @@ func main() {
 	task := timer.New(rClient, "timer-demo")
 
 	for i := 0; i < 1000; i++ {
-		task.Schedule(context.Background(), fmt.Sprintf("%d", i))
+		if err := task.Schedule(ctx, fmt.Sprintf("%d", i)); err != nil {
+			fmt.Println("schedule error:", err)
+			return
+		}
 	}
+	fmt.Println("schedule:", 1000)
 
 	//if err := task.Schedule(ctx, "immediate", timer.WithBody("run now")); err != nil {
 	//	fmt.Println("schedule immediate error:", err)

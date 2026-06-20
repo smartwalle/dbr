@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -74,6 +75,14 @@ var (
 	ErrTimerRunning    = errors.New("timer is running")
 	ErrTimerClosed     = errors.New("timer closed")
 )
+
+const minPollInterval = 10 * time.Millisecond
+
+type acquireResult struct {
+	messages  []*Message
+	now       int64
+	nextRunAt int64
+}
 
 // Timer 是一个基于 Redis 的简单分布式定时器。
 //
@@ -262,29 +271,29 @@ func (timer *Timer) Start(ctx context.Context) error {
 
 		available := timer.maxInFlight - int(timer.inFlight.Load())
 		if available <= 0 {
-			if !timer.sleep(ctx) {
+			if !timer.sleep(ctx, timer.pollInterval) {
 				return nil
 			}
 			continue
 		}
 
-		messages, err := timer.acquire(ctx, available)
+		result, err := timer.acquire(ctx, available)
 		if err != nil {
 			timer.handleError(ctx, err)
-			if !timer.sleep(ctx) {
+			if !timer.sleep(ctx, timer.pollInterval) {
 				return nil
 			}
 			continue
 		}
 
-		for _, message := range messages {
+		for _, message := range result.messages {
 			timer.inFlight.Add(1)
 			timer.wg.Add(1)
 			go timer.handleMessage(ctx, message)
 		}
 
-		if len(messages) == 0 || len(messages) < available {
-			if !timer.sleep(ctx) {
+		if len(result.messages) < available {
+			if !timer.sleep(ctx, timer.nextPollInterval(result)) {
 				return nil
 			}
 		}
@@ -320,9 +329,9 @@ func (timer *Timer) Stop(ctx context.Context) error {
 }
 
 // acquire 原子领取已到期消息；领取成功的消息会立即从 Redis 删除。
-func (timer *Timer) acquire(ctx context.Context, limit int) ([]*Message, error) {
+func (timer *Timer) acquire(ctx context.Context, limit int) (acquireResult, error) {
 	if limit <= 0 {
-		return nil, nil
+		return acquireResult{}, nil
 	}
 
 	keys := []string{
@@ -336,18 +345,30 @@ func (timer *Timer) acquire(ctx context.Context, limit int) ([]*Message, error) 
 
 	raw, err := internal.AcquireScript.Run(ctx, timer.client, keys, args...).Slice()
 	if err != nil {
-		return nil, err
+		return acquireResult{}, err
 	}
 
-	messages := make([]*Message, 0, len(raw)/2)
-	for i := 0; i+1 < len(raw); i += 2 {
-		messages = append(messages, &Message{
+	result := acquireResult{}
+	if len(raw) > 0 {
+		result.now = int64Value(raw[0])
+	}
+	if len(raw) > 1 {
+		result.nextRunAt = int64Value(raw[1])
+	}
+
+	count := 0
+	if len(raw) > 2 {
+		count = (len(raw) - 2) / 2
+	}
+	result.messages = make([]*Message, 0, count)
+	for i := 2; i+1 < len(raw); i += 2 {
+		result.messages = append(result.messages, &Message{
 			id:    stringValue(raw[i]),
 			queue: timer.queue,
 			body:  stringValue(raw[i+1]),
 		})
 	}
-	return messages, nil
+	return result, nil
 }
 
 func (timer *Timer) handleMessage(ctx context.Context, message *Message) {
@@ -399,8 +420,35 @@ func (timer *Timer) commandContext(ctx context.Context) (context.Context, contex
 	return context.WithTimeout(ctx, timer.commandTimeout)
 }
 
-func (timer *Timer) sleep(ctx context.Context) bool {
-	t := time.NewTimer(timer.pollInterval)
+func (timer *Timer) nextPollInterval(result acquireResult) time.Duration {
+	if result.nextRunAt <= 0 || result.now <= 0 {
+		return timer.pollInterval
+	}
+
+	minimum := minPollInterval
+	if timer.pollInterval < minimum {
+		minimum = timer.pollInterval
+	}
+
+	interval := time.Duration(result.nextRunAt-result.now) * time.Millisecond
+	if interval <= 0 {
+		return minimum
+	}
+	if interval > timer.pollInterval {
+		return timer.pollInterval
+	}
+	if interval < minimum {
+		return minimum
+	}
+	return interval
+}
+
+func (timer *Timer) sleep(ctx context.Context, interval time.Duration) bool {
+	if interval <= 0 {
+		interval = minPollInterval
+	}
+
+	t := time.NewTimer(interval)
 	defer t.Stop()
 
 	select {
@@ -421,5 +469,27 @@ func stringValue(value any) string {
 		return ""
 	default:
 		return fmt.Sprint(v)
+	}
+}
+
+func int64Value(value any) int64 {
+	switch v := value.(type) {
+	case int64:
+		return v
+	case int:
+		return int64(v)
+	case float64:
+		return int64(v)
+	case string:
+		n, _ := strconv.ParseInt(v, 10, 64)
+		return n
+	case []byte:
+		n, _ := strconv.ParseInt(string(v), 10, 64)
+		return n
+	case nil:
+		return 0
+	default:
+		n, _ := strconv.ParseInt(fmt.Sprint(v), 10, 64)
+		return n
 	}
 }

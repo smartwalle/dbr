@@ -16,12 +16,12 @@ if redis.call('EXISTS', messageKey) == 0 then
 	redis.call('HSET', messageKey, 'created_at', now)
 end
 
-	redis.call('HSET', messageKey,
-		'id', id,
-		'body', body,
-		'run_at', triggerAt,
-		'updated_at', now
-	)
-	redis.call('ZADD', scheduledKey, triggerAt, id)
+redis.call('HSET', messageKey,
+	'id', id,
+	'body', body,
+	'run_at', triggerAt,
+	'updated_at', now
+)
+redis.call('ZADD', scheduledKey, triggerAt, id)
 
 return 1

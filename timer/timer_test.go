@@ -62,6 +62,59 @@ func TestScheduleUpdateCancel(t *testing.T) {
 	}
 }
 
+func TestNextPollInterval(t *testing.T) {
+	task := New(nil, "test", WithPollInterval(time.Second))
+
+	tests := []struct {
+		name   string
+		result acquireResult
+		want   time.Duration
+	}{
+		{
+			name:   "empty queue uses poll interval",
+			result: acquireResult{now: 1000, nextRunAt: 0},
+			want:   time.Second,
+		},
+		{
+			name:   "future message uses shorter interval",
+			result: acquireResult{now: 1000, nextRunAt: 1100},
+			want:   100 * time.Millisecond,
+		},
+		{
+			name:   "far future message uses poll interval",
+			result: acquireResult{now: 1000, nextRunAt: 3000},
+			want:   time.Second,
+		},
+		{
+			name:   "near message uses minimum interval",
+			result: acquireResult{now: 1000, nextRunAt: 1001},
+			want:   minPollInterval,
+		},
+		{
+			name:   "due message uses minimum interval",
+			result: acquireResult{now: 1000, nextRunAt: 1000},
+			want:   minPollInterval,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := task.nextPollInterval(tt.result); got != tt.want {
+				t.Fatalf("nextPollInterval() = %s, want %s", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestNextPollIntervalHonorsSmallPollInterval(t *testing.T) {
+	task := New(nil, "test", WithPollInterval(5*time.Millisecond))
+	result := acquireResult{now: 1000, nextRunAt: 1001}
+
+	if got := task.nextPollInterval(result); got != 5*time.Millisecond {
+		t.Fatalf("nextPollInterval() = %s, want %s", got, 5*time.Millisecond)
+	}
+}
+
 func TestStartHonorsMaxInFlight(t *testing.T) {
 	client := testRedisClient(t)
 	ctx := context.Background()
