@@ -13,8 +13,18 @@ import (
 	"github.com/smartwalle/dbr/sfcache"
 )
 
+func newTestClient(t *testing.T) dbr.UniversalClient {
+	t.Helper()
+
+	rClient, err := dbr.New("192.168.2.229:6379", "", 1, 2, 2)
+	if err != nil {
+		t.Skip("Redis 不可用，跳过测试:", err)
+	}
+	return rClient
+}
+
 func TestClient_Load(t *testing.T) {
-	var rClient, _ = dbr.New("127.0.0.1:6379", "", 1, 2, 2)
+	var rClient = newTestClient(t)
 	var value, err = sfcache.Load(context.Background(), rClient, "load:1", func(ctx context.Context) ([]byte, error) {
 		t.Log("开始加载数据")
 		time.Sleep(time.Second)
@@ -26,14 +36,44 @@ func TestClient_Load(t *testing.T) {
 	t.Log(string(value))
 }
 
+func TestClient_LoadHyphenValue(t *testing.T) {
+	var rClient = newTestClient(t)
+	var key = "load:hyphen"
+	rClient.Del(context.Background(), key, key+":empty", key+":lock")
+
+	var value []byte
+	value, err := sfcache.Load(context.Background(), rClient, key, func(ctx context.Context) ([]byte, error) {
+		return []byte("-"), nil
+	}, sfcache.WithExpiration(time.Second*5))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(value, []byte("-")) {
+		t.Fatalf("数据不匹配，期望: -, 实际: %s", string(value))
+	}
+
+	value, err = sfcache.Load(context.Background(), rClient, key, func(ctx context.Context) ([]byte, error) {
+		t.Fatal("不应该调用 fn，因为真实值已经写入缓存")
+		return nil, nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(value, []byte("-")) {
+		t.Fatalf("数据不匹配，期望: -, 实际: %s", string(value))
+	}
+}
+
 func TestClient_Load2(t *testing.T) {
-	var rClient, _ = dbr.New("127.0.0.1:6379", "", 1, 2, 2)
+	var rClient = newTestClient(t)
+	var key = "load:2"
+	rClient.Del(context.Background(), key, key+":empty", key+":lock")
 
 	var wg sync.WaitGroup
 	for i := 0; i < 1000; i++ {
 		wg.Add(1)
 		go func() {
-			value, err := sfcache.Load(context.Background(), rClient, "load:2", func(ctx context.Context) ([]byte, error) {
+			value, err := sfcache.Load(context.Background(), rClient, key, func(ctx context.Context) ([]byte, error) {
 				t.Log("开始加载数据")
 				time.Sleep(time.Millisecond * 140)
 				t.Log("数据加载完成")
@@ -52,11 +92,11 @@ func TestClient_Load2(t *testing.T) {
 }
 
 func TestClient_Load3(t *testing.T) {
-	var rClient, _ = dbr.New("127.0.0.1:6379", "", 1, 2, 2)
+	var rClient = newTestClient(t)
 	var key = "load:3"
 
 	// 先删除可能存在的缓存
-	rClient.Del(context.Background(), key)
+	rClient.Del(context.Background(), key, key+":empty", key+":lock")
 
 	var callCount int64
 	var wg sync.WaitGroup
@@ -78,7 +118,6 @@ func TestClient_Load3(t *testing.T) {
 				return []byte("缓存击穿保护测试数据"), nil
 			},
 				sfcache.WithExpiration(time.Second*100),
-				sfcache.WithMaxAttempts(5),
 				sfcache.WithRetryDelay(time.Millisecond*100),
 			)
 
@@ -109,38 +148,34 @@ func TestClient_Load3(t *testing.T) {
 }
 
 func TestClient_LoadNegativeCache(t *testing.T) {
-	var rClient, err = dbr.New("127.0.0.1:6379", "", 1, 2, 2)
-	if err != nil {
-		t.Skip("Redis 不可用，跳过测试:", err)
-	}
-
+	var rClient = newTestClient(t)
 	var key = "load:negative"
-	rClient.Del(context.Background(), key)
+	rClient.Del(context.Background(), key, key+":empty", key+":lock")
 
-	// 1. 模拟加载失败
-	_, err = sfcache.Load(context.Background(), rClient, key, func(ctx context.Context) ([]byte, error) {
+	// 1. 模拟数据不存在
+	_, err := sfcache.Load(context.Background(), rClient, key, func(ctx context.Context) ([]byte, error) {
 		t.Log("第一次加载数据")
-		return nil, errors.New("读取数据异常") // 模拟加载失败
-	}, sfcache.WithPlaceholderExpiration(time.Second*2))
+		return nil, sfcache.ErrNotFound
+	}, sfcache.WithEmptyExpiration(time.Second*2))
 
-	if err == nil {
-		t.Fatal("期望加载失败，但成功了")
+	if !errors.Is(err, sfcache.ErrNotFound) {
+		t.Fatalf("期望返回 sfcache.ErrNotFound，实际返回: %v", err)
 	}
 
-	// 2. 立即再次尝试，应该命中“负面缓存”占位符，返回 redis.Nil
+	// 2. 立即再次尝试，应该命中 emptyKey，不再调用 fn
 	_, err = sfcache.Load(context.Background(), rClient, key, func(ctx context.Context) ([]byte, error) {
 		t.Fatal("不应该调用 fn，因为应该命中负面缓存")
 		return nil, nil
 	})
 
-	if !errors.Is(err, sfcache.ErrHitPlaceholder) {
-		t.Errorf("期望返回 sfcache.ErrHitPlaceholder (负面缓存)，实际返回: %v", err)
+	if !errors.Is(err, sfcache.ErrNotFound) {
+		t.Errorf("期望返回 sfcache.ErrNotFound (负面缓存)，实际返回: %v", err)
 	}
 
-	// 3. 等待占位符过期
+	// 3. 等待 emptyKey 过期
 	time.Sleep(time.Second * 3)
 
-	// 4. 再次尝试，占位符已过期，应该重新调用 fn
+	// 4. 再次尝试，emptyKey 已过期，应该重新调用 fn
 	var called = false
 	_, err = sfcache.Load(context.Background(), rClient, key, func(ctx context.Context) ([]byte, error) {
 		called = true
@@ -149,6 +184,6 @@ func TestClient_LoadNegativeCache(t *testing.T) {
 	})
 
 	if !called {
-		t.Error("占位符过期后，应该重新调用 fn")
+		t.Error("emptyKey 过期后，应该重新调用 fn")
 	}
 }
