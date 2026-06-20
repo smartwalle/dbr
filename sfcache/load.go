@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -176,12 +175,15 @@ var setEmptyScript = redis.NewScript(`
 //  3. 重试与超时: 支持配置加载、写入、锁租约和等待超时。
 //
 // fn 应区分“数据不存在”和“临时错误”：只有返回 ErrNotFound 才会写入负面缓存。
+// 同一 client/key 的并发调用会共享最先进入 singleflight 的 fn 和 opts，调用方应保证同一 key 的加载语义一致。
+// 如果使用 Redis Cluster，调用方应自行使用 hash tag 保证 key、key:lock、key:empty 落在同一 slot。
 func Load(ctx context.Context, client redis.UniversalClient, key string, fn func(context.Context) ([]byte, error), opts ...Option) (value []byte, err error) {
 	loadOpts := newOptions(opts...)
 
 	// 先用本地 singleflight 合并同一进程内的并发请求，避免大量 goroutine 同时竞争 Redis 锁。
 	resultCh := loadGroup.DoChan(loadGroupKey(client, key), func() (any, error) {
-		return load(ctx, client, key, fn, loadOpts)
+		// 底层共享加载不能绑定第一个调用者的取消信号，否则第一个请求超时会连带影响其它等待者。
+		return load(context.WithoutCancel(ctx), client, key, fn, loadOpts)
 	})
 
 	select {
@@ -237,8 +239,8 @@ func newOptions(opts ...Option) *Options {
 // load 是 Load 的跨进程并发控制实现。它先读真实缓存和 emptyKey，
 // 未命中时尝试获取 Redis 锁；未获取到锁的请求会轮询等待其它加载者写入结果。
 func load(ctx context.Context, client redis.UniversalClient, key string, fn func(context.Context) ([]byte, error), opts *Options) (value []byte, err error) {
-	var lockKey = strings.Join([]string{key, "lock"}, ":")
-	var emptyKey = strings.Join([]string{key, "empty"}, ":")
+	var lockKey = key + ":lock"
+	var emptyKey = key + ":empty"
 
 	var waitCtx = ctx
 	var waitCancel context.CancelFunc
@@ -334,6 +336,10 @@ func loadLocked(ctx context.Context, client redis.UniversalClient, key string, e
 
 	// 只有持锁者会执行 fn；其它进程或 goroutine 会在 load 的等待循环里轮询结果。
 	if value, err = fn(loadCtx); err != nil {
+		if loadErr := loadCtx.Err(); loadErr != nil {
+			// fn 如果忽略 ctx 并在超时后才返回错误，该结果也不能再影响缓存状态。
+			return nil, loadErr
+		}
 		if errors.Is(err, ErrNotFound) {
 			// 只有明确不存在才写负面缓存；临时错误直接返回，避免把故障缓存成空结果。
 			if err = setEmpty(ctx, client, key, emptyKey, lockKey, lockValue, opts.EmptyExpiration, opts.WriteTimeout); err != nil {
