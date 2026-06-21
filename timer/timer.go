@@ -104,11 +104,11 @@ type Timer struct {
 	pollInterval   time.Duration
 	commandTimeout time.Duration
 
-	mu           sync.Mutex
-	rootCancel   context.CancelFunc
-	rootFinished chan struct{}
-	inFlight     atomic.Int64
-	wg           sync.WaitGroup
+	mu       sync.Mutex
+	cancel   context.CancelFunc
+	done     chan struct{}
+	inFlight atomic.Int64
+	wg       sync.WaitGroup
 }
 
 // New 创建一个 Timer。
@@ -242,11 +242,11 @@ func (timer *Timer) Start(ctx context.Context) error {
 	}
 
 	ctx, cancel := context.WithCancel(ctx)
-	finished := make(chan struct{})
+	done := make(chan struct{})
 
 	timer.state = StateRunning
-	timer.rootCancel = cancel
-	timer.rootFinished = finished
+	timer.cancel = cancel
+	timer.done = done
 	timer.mu.Unlock()
 
 	defer func() {
@@ -255,11 +255,11 @@ func (timer *Timer) Start(ctx context.Context) error {
 
 		timer.mu.Lock()
 		timer.state = StateClosed
-		timer.rootCancel = nil
-		timer.rootFinished = nil
+		timer.cancel = nil
+		timer.done = nil
 		timer.mu.Unlock()
 
-		close(finished)
+		close(done)
 	}()
 
 	for {
@@ -303,8 +303,8 @@ func (timer *Timer) Start(ctx context.Context) error {
 // Stop 停止定时器，并等待已经触发的 MessageHandler 返回。
 func (timer *Timer) Stop(ctx context.Context) error {
 	timer.mu.Lock()
-	var cancel = timer.rootCancel
-	var done = timer.rootFinished
+	var cancel = timer.cancel
+	var done = timer.done
 	switch timer.state {
 	case StateClosed:
 		timer.mu.Unlock()
